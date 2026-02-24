@@ -36,6 +36,9 @@
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       .prompt-clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; transition: none !important; }
+      }
     </style>
 
     <!-- Import Map: Defines where "react", "react-dom", and "lucide-react" come from -->
@@ -327,6 +330,21 @@
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit euismod. Pellentesque et blandit nunc, ultricies aliquam lectus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit euismod. Pellentesque et blandit nunc, ultricies aliquam lectus. Etiam finibus blandit euismod. Pellentesque et blandit nunc, ultricies aliquam lectus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit euismod. Pellentesque et blandit nunc, ultricies aliquam lectus.`;
 
         const cx = (...classes) => classes.filter(Boolean).join(' ');
+        const FOCUS_RING = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-elm-dark/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white";
+
+        const getFocusableElements = (container) => {
+            if (!container) return [];
+            const selectors = [
+                'a[href]',
+                'button:not([disabled])',
+                'input:not([disabled])',
+                'select:not([disabled])',
+                'textarea:not([disabled])',
+                '[tabindex]:not([tabindex="-1"])'
+            ];
+            return Array.from(container.querySelectorAll(selectors.join(',')))
+                .filter((el) => !el.hasAttribute('aria-hidden'));
+        };
 
         // -- Roles available in the mockup role switcher.
         // Users with the 'undergraduate' role cannot disable university moderation.
@@ -339,12 +357,15 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit e
         ];
 
         const UI_STYLES = {
+            focus: {
+                ring: FOCUS_RING
+            },
             button: {
-                primary: "flex items-center gap-2 bg-elm-dark hover:bg-green-900 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm",
-                primaryCompact: "flex items-center gap-2 bg-elm-dark hover:bg-green-900 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors shadow-sm text-sm",
-                icon: "p-2 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors",
-                chip: "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-green-900 hover:text-white hover:border-green-900 rounded-md transition-colors border border-gray-200",
-                selectorBase: "flex items-center gap-2 border rounded-lg px-3 py-1.5 transition-all font-medium max-w-[220px] sm:max-w-xs",
+                primary: `flex items-center gap-2 bg-elm-dark hover:bg-green-900 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm motion-reduce:transition-none ${FOCUS_RING}`,
+                primaryCompact: `flex items-center gap-2 bg-elm-dark hover:bg-green-900 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors shadow-sm text-sm motion-reduce:transition-none ${FOCUS_RING}`,
+                icon: `p-2 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors motion-reduce:transition-none ${FOCUS_RING} min-w-[36px] min-h-[36px]`,
+                chip: `flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-green-900 hover:text-white hover:border-green-900 rounded-md transition-colors border border-gray-200 motion-reduce:transition-none ${FOCUS_RING}`,
+                selectorBase: `flex items-center gap-2 border rounded-lg px-3 py-1.5 transition-all font-medium max-w-[220px] sm:max-w-xs motion-reduce:transition-none ${FOCUS_RING}`,
                 selectorInactive: "bg-white/50 border-gray-400 text-elm-dark hover:bg-white hover:shadow-sm",
                 selectorActive: "bg-elm-dark border-elm-dark text-white shadow-sm"
             },
@@ -399,11 +420,11 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit e
                 panel: "absolute bottom-full left-0 mb-2 w-72 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50 origin-bottom-left max-h-[70vh] overflow-y-auto",
                 mobileOverlay: "fixed inset-0 z-40 bg-black/40",
                 mobilePanel: "fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-2xl shadow-2xl max-h-[80vh] overflow-y-auto",
-                groupLabel: "px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2",
+                groupLabel: "px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-600 flex items-center gap-2",
                 item: "w-full flex items-center justify-between gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition-colors text-left",
                 itemActive: "text-elm-dark font-semibold",
                 check: "text-elm-dark",
-                subMenuTrigger: "text-gray-400",
+                subMenuTrigger: "text-gray-600",
                 footer: "border-t border-gray-200 px-4 py-3"
             },
             // -- Styles for the Model Guide full-page view.
@@ -464,7 +485,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit e
                             </div>
                             <button 
                                 onClick={onClose}
-                                className="p-1 rounded-md hover:bg-gray-200 md:hidden"
+                                className={cx("p-2 rounded-md hover:bg-gray-200 md:hidden min-w-[36px] min-h-[36px]", UI_STYLES.focus.ring)}
                                 aria-label="Close sidebar"
                             >
                                 <Icon name="close" size={24} className="text-gray-600" />
@@ -478,7 +499,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit e
 
                         <button 
                             onClick={() => handleNavClick('chat')}
-                            className="w-full flex items-center justify-center gap-2 bg-[#dcdcdc] hover:bg-[#d0d0d0] text-gray-700 py-3 rounded-lg transition-colors font-medium border border-transparent focus:ring-2 focus:ring-elm-dark/20 focus:outline-none"
+                            className={cx("w-full flex items-center justify-center gap-2 bg-[#dcdcdc] hover:bg-[#d0d0d0] text-gray-700 py-3 rounded-lg transition-colors font-medium border border-transparent", UI_STYLES.focus.ring)}
                             aria-label="Start a new chat"
                         >
                             <div className="relative">
@@ -571,8 +592,9 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit e
             return (
                 <button 
                     onClick={handleCopy}
-                    className={`p-1.5 bg-white border border-gray-200 rounded-full text-gray-400 hover:text-gray-600 shadow-sm transition-all ${className}`}
+                    className={cx(`p-2 bg-white border border-gray-200 rounded-full text-gray-500 hover:text-gray-700 shadow-sm transition-all motion-reduce:transition-none min-w-[36px] min-h-[36px] ${className}`, UI_STYLES.focus.ring)}
                     title="Copy"
+                    aria-label="Copy message"
                 >
                     {copied ? <Icon name="check" size={14} className="text-green-500" /> : <Icon name="content_copy" size={14} />}
                 </button>
@@ -627,6 +649,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit e
             const [isChatLocked, setIsChatLocked] = useState(false);
             const [disableReason, setDisableReason] = useState('');
             const [showReasonForm, setShowReasonForm] = useState(false);
+            const [disableReasonTouched, setDisableReasonTouched] = useState(false);
 
             // Model Dropdown State -- controls the quick-switch popover
             const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
@@ -642,9 +665,88 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit e
             const chatContainerRef = useRef(null);
             const inputRef = useRef(null);
             const imageInputRef = useRef(null);
+            const promptDialogRef = useRef(null);
+            const uploadDialogRef = useRef(null);
+            const settingsDialogRef = useRef(null);
+            const mobileSheetRef = useRef(null);
             const resizingRef = useRef(false);
             const startYRef = useRef(0);
             const startHeightRef = useRef(0);
+
+            const handleDialogKeyDown = (event, containerRef, onClose) => {
+                if (event.key === 'Escape') {
+                    event.stopPropagation();
+                    if (onClose) {
+                        onClose();
+                    }
+                    return;
+                }
+                if (event.key !== 'Tab') return;
+                const focusables = getFocusableElements(containerRef.current);
+                if (!focusables.length) return;
+                const first = focusables[0];
+                const last = focusables[focusables.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            };
+
+            // Keep focus inside open dialogs for keyboard users.
+            useEffect(() => {
+                if (!isPromptModalOpen || !promptDialogRef.current) return;
+                const previousFocus = document.activeElement;
+                const focusables = getFocusableElements(promptDialogRef.current);
+                const target = focusables[0] || promptDialogRef.current;
+                target.focus();
+                return () => {
+                    if (previousFocus && previousFocus.focus) {
+                        previousFocus.focus();
+                    }
+                };
+            }, [isPromptModalOpen]);
+
+            useEffect(() => {
+                if (!isUploadModalOpen || !uploadDialogRef.current) return;
+                const previousFocus = document.activeElement;
+                const focusables = getFocusableElements(uploadDialogRef.current);
+                const target = focusables[0] || uploadDialogRef.current;
+                target.focus();
+                return () => {
+                    if (previousFocus && previousFocus.focus) {
+                        previousFocus.focus();
+                    }
+                };
+            }, [isUploadModalOpen]);
+
+            useEffect(() => {
+                if (!isSettingsModalOpen || !settingsDialogRef.current) return;
+                const previousFocus = document.activeElement;
+                const focusables = getFocusableElements(settingsDialogRef.current);
+                const target = focusables[0] || settingsDialogRef.current;
+                target.focus();
+                return () => {
+                    if (previousFocus && previousFocus.focus) {
+                        previousFocus.focus();
+                    }
+                };
+            }, [isSettingsModalOpen]);
+
+            useEffect(() => {
+                if (!mobileSheet || !mobileSheetRef.current) return;
+                const previousFocus = document.activeElement;
+                const focusables = getFocusableElements(mobileSheetRef.current);
+                const target = focusables[0] || mobileSheetRef.current;
+                target.focus();
+                return () => {
+                    if (previousFocus && previousFocus.focus) {
+                        previousFocus.focus();
+                    }
+                };
+            }, [mobileSheet]);
 
             useEffect(() => {
                 if (messagesEndRef.current) {
@@ -891,6 +993,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                 setIsModerationDisabled(false);
                 setDisableReason("");
                 setShowReasonForm(false);
+                setDisableReasonTouched(false);
                 setActiveDropdown(null);
             };
 
@@ -967,7 +1070,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
 
                                     {/* Show "Coming soon" for empty groups like Gemini */}
                                     {groupModels.length === 0 ? (
-                                        <p className="px-4 py-2 text-xs text-gray-400 italic">Coming soon</p>
+                                        <p className="px-4 py-2 text-xs text-gray-600 italic">Coming soon</p>
                                     ) : (
                                         groupModels.map(model => {
                                             const isSelected = selectedModelName === model.name;
@@ -1015,7 +1118,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                                                         when the user clicks a thinking model (works on both desktop and mobile) */}
                                                     {showSubMenu && (
                                                         <div className="px-4 py-2.5 bg-gray-50 border-t border-b border-gray-100">
-                                                            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">
+                                                            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-600 mb-2">
                                                                 Reasoning Amount
                                                             </p>
                                                             {REASONING_LEVELS.map(level => (
@@ -1073,7 +1176,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                             <div className={UI_STYLES.modelDropdown.mobilePanel}>
                                 <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
                                     <h3 className="text-base font-bold text-gray-900">Select a model</h3>
-                                    <button onClick={() => setIsModelDropdownOpen(false)} className="p-1 hover:bg-gray-100 rounded-full">
+                                    <button onClick={() => setIsModelDropdownOpen(false)} className={cx("p-2 hover:bg-gray-100 rounded-full min-w-[36px] min-h-[36px]", UI_STYLES.focus.ring)} aria-label="Close model selector">
                                         <Icon name="close" size={20} className="text-gray-500" />
                                     </button>
                                 </div>
@@ -1137,22 +1240,30 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                   ];
 
                 return (
-                <div className="fixed inset-0 z-50 sm:hidden" aria-modal="true" role="dialog">
-                    <button className="absolute inset-0 bg-black/40" onClick={() => setMobileSheet(null)} aria-label="Close menu" />
+                <div
+                    className="fixed inset-0 z-50 sm:hidden"
+                    aria-modal="true"
+                    role="dialog"
+                    aria-labelledby="mobile-sheet-title"
+                    ref={mobileSheetRef}
+                    tabIndex={-1}
+                    onKeyDown={(e) => handleDialogKeyDown(e, mobileSheetRef, () => setMobileSheet(null))}
+                >
+                    <button className={cx("absolute inset-0 bg-black/40", UI_STYLES.focus.ring)} onClick={() => setMobileSheet(null)} aria-label="Close menu" />
                     <div className="absolute inset-x-0 bottom-0 bg-white rounded-t-2xl shadow-2xl p-4 pb-6">
                         <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                             <Icon name={headerIcon} size={20} />
-                            <span className="text-base font-semibold text-gray-900">{title}</span>
+                            <span id="mobile-sheet-title" className="text-base font-semibold text-gray-900">{title}</span>
                         </div>
-                        <button className="p-2 rounded-full text-gray-500 hover:bg-gray-100" onClick={() => setMobileSheet(null)} aria-label="Close">
+                        <button className={cx("p-2 rounded-full text-gray-500 hover:bg-gray-100 min-w-[36px] min-h-[36px]", UI_STYLES.focus.ring)} onClick={() => setMobileSheet(null)} aria-label="Close">
                             <Icon name="close" size={20} />
                         </button>
                         </div>
                         {/* For the Account sheet, show a role switcher above the standard options */}
                         {isAccount && (
                             <div className="mb-4 pb-4 border-b border-gray-200">
-                                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Switch role (demo)</p>
+                                <p className="text-xs font-bold uppercase tracking-wider text-gray-600 mb-2">Switch role (demo)</p>
                                 <div className="space-y-1">
                                     {ROLES.map(role => (
                                         <button
@@ -1411,26 +1522,32 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                         className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
                         role="dialog"
                         aria-modal="true"
+                        aria-labelledby="prompt-modal-title"
+                        aria-describedby="prompt-modal-desc"
+                        ref={promptDialogRef}
+                        tabIndex={-1}
+                        onKeyDown={(e) => handleDialogKeyDown(e, promptDialogRef, closePromptModal)}
                         >
                         <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl flex flex-col overflow-hidden">
                             <div className="flex items-center justify-between p-5 border-b border-gray-100">
-                            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                            <h2 id="prompt-modal-title" className="text-xl font-bold text-gray-900 flex items-center gap-2">
                                 <Icon name="add_circle" size={22} className="text-elm-dark" />
                                 <span>New prompt</span>
                             </h2>
-                            <button onClick={closePromptModal} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500" aria-label="Close">
+                            <button onClick={closePromptModal} className={cx("p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500 min-w-[36px] min-h-[36px]", UI_STYLES.focus.ring)} aria-label="Close">
                                 <Icon name="close" size={20} />
                             </button>
                             </div>
 
                             <div className="p-6 space-y-4">
+                            <p id="prompt-modal-desc" className="sr-only">Create a new prompt for the prompt library.</p>
                             <div className="space-y-1.5">
                                 <label className="text-xs font-bold text-gray-700 ml-1">Prompt title</label>
                                 <input
                                 type="text"
                                 value={promptDraft.title}
                                 onChange={(e) => setPromptDraft(prev => ({ ...prev, title: e.target.value }))}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-elm-dark/20 focus:border-elm-dark outline-none text-sm"
+                                className={cx("w-full p-3 border border-gray-300 rounded-lg text-sm", UI_STYLES.focus.ring)}
                                 placeholder="Give your prompt a clear title"
                                 />
                             </div>
@@ -1439,7 +1556,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                                 <textarea
                                 value={promptDraft.text}
                                 onChange={(e) => setPromptDraft(prev => ({ ...prev, text: e.target.value }))}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-elm-dark/20 focus:border-elm-dark outline-none text-sm h-32 resize-none"
+                                className={cx("w-full p-3 border border-gray-300 rounded-lg text-sm h-32 resize-none", UI_STYLES.focus.ring)}
                                 placeholder="Write the prompt you want to reuse"
                                 />
                             </div>
@@ -1595,10 +1712,10 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                                 <div className="space-y-1">
                                     <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
                                     <span 
-                                        className={`inline-flex items-center justify-center w-7 h-7 rounded-full border mr-0 sm:mr-1 ${history.pinned ? 'border-green-200 bg-green-50 text-elm-dark' : 'border-gray-200 bg-gray-100 text-gray-400'}`}
+                                        className={`inline-flex items-center justify-center w-7 h-7 rounded-full border mr-0 sm:mr-1 ${history.pinned ? 'border-green-200 bg-green-50 text-elm-dark' : 'border-gray-200 bg-gray-100 text-gray-600'}`}
                                         aria-label={history.pinned ? 'Pinned chat' : 'Not pinned'}
                                     >
-                                        {history.pinned ? <Icon name="push_pin" size={18} /> : <Icon name="push_pin" size={18} className="text-gray-400" />}
+                                        {history.pinned ? <Icon name="push_pin" size={18} /> : <Icon name="push_pin" size={18} className="text-gray-600" />}
                                     </span>
                                     {editingHistoryId === history.id ? (
                                         <input 
@@ -1606,7 +1723,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                                         onClick={(e) => e.stopPropagation()}
                                         onChange={(e) => setEditingTitle(e.target.value)}
                                         onBlur={saveEditingHistory}
-                                        className="w-full sm:w-auto border border-gray-300 rounded-lg px-3 py-2 text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-elm-dark/30"
+                                        className={cx("w-full sm:w-auto border border-gray-300 rounded-lg px-3 py-2 text-sm font-semibold text-gray-800", UI_STYLES.focus.ring)}
                                         autoFocus
                                         />
                                     ) : (
@@ -1639,7 +1756,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                                 </div>
                                 <div className="text-center sm:text-right text-sm text-gray-500 w-full sm:w-auto">
                                 <p className="font-semibold text-gray-700">{history.updated}</p>
-                                <p className="text-xs text-gray-400">{history.messages.length} messages · {history.length}</p>
+                                <p className="text-xs text-gray-600">{history.messages.length} messages · {history.length}</p>
                                 </div>
                             </div>
 
@@ -2097,7 +2214,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                                     <input
                                         type="text"
                                         defaultValue={activeFolder?.name || "drafts"}
-                                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-elm-dark/20 focus:border-elm-dark text-gray-900"
+                                        className={cx("w-full p-3 border border-gray-300 rounded-lg text-gray-900", UI_STYLES.focus.ring)}
                                     />
                                 </div>
 
@@ -2142,7 +2259,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-semibold text-gray-700 ml-1">Description</label>
                                     <textarea
-                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-elm-dark/20 focus:border-elm-dark outline-none text-sm h-24 resize-none"
+                                        className={cx("w-full p-3 border border-gray-300 rounded-lg text-sm h-24 resize-none", UI_STYLES.focus.ring)}
                                         placeholder=""
                                     />
                                 </div>
@@ -2155,7 +2272,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                                         Cancel
                                     </button>
                                     <button
-                                        className="px-6 py-2 bg-gray-200 text-gray-400 rounded-lg text-sm font-semibold cursor-not-allowed"
+                                        className="px-6 py-2 bg-gray-200 text-gray-500 rounded-lg text-sm font-semibold cursor-not-allowed"
                                         disabled
                                     >
                                         Upload
@@ -2194,7 +2311,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                     </button>
                     
                     <button 
-                        className="p-2 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100 transition-colors"
+                        className={cx("p-2 text-gray-600 hover:text-gray-800 rounded-md hover:bg-gray-100 transition-colors min-w-[36px] min-h-[36px]", UI_STYLES.focus.ring)}
                         aria-label="New chat"
                         onClick={() => { setMessages([]); setHasChatStarted(false); setInputVal(""); setIsChatLocked(false); setShowReasonForm(false); setDisableReason(""); }}
                     >
@@ -2221,7 +2338,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                                     setMessages(prev => [...prev, { role: 'info', content: 'University moderation has been re-enabled.' }]);
                                     setHasChatStarted(true);
                                 }}
-                                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200 transition-colors"
+                                className={cx("flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200 transition-colors motion-reduce:transition-none", UI_STYLES.focus.ring)}
                                 aria-label="University moderation is off. Click to re-enable."
                                 title="Click to re-enable university moderation"
                             >
@@ -2297,7 +2414,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                             <div className="absolute top-full right-0 mt-2 w-64 bg-[#ebebeb] rounded-lg shadow-xl border border-gray-200 py-2 overflow-hidden z-30 origin-top-right">
                                 {/* Role switcher -- for the mockup demo, switch between user roles here */}
                                 <div className="px-3 pt-1 pb-2 border-b border-gray-300">
-                                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1.5 px-1">Switch role (demo)</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-600 mb-1.5 px-1">Switch role (demo)</p>
                                     {ROLES.map(role => (
                                         <button
                                             key={role.id}
@@ -2368,7 +2485,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                             <div className="p-4 pb-0">
                                 <textarea
                                 ref={inputRef}
-                                className={`w-full bg-transparent border-none resize-none focus:ring-0 text-gray-800 placeholder-gray-500 text-base ${isChatLocked ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                className={cx(`w-full bg-transparent border-none resize-none text-gray-800 placeholder-gray-600 text-base ${isChatLocked ? 'opacity-40 cursor-not-allowed' : ''}`, UI_STYLES.focus.ring)}
                                 placeholder={isChatLocked ? "Chat locked by moderation." : "Ask anything..."}
                                 aria-label="Chat input"
                                 style={{ height: `${inputHeight}px`, minHeight: '64px', maxHeight: '400px' }}
@@ -2466,7 +2583,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                                 </div>
 
                                 <button 
-                                    className={`p-2 rounded-lg transition-colors ${inputVal.trim() ? 'bg-elm-dark text-white hover:bg-green-900' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                                    className={cx(`p-2 rounded-lg transition-colors ${inputVal.trim() ? 'bg-elm-dark text-white hover:bg-green-900' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`, UI_STYLES.focus.ring)}
                                     onClick={handleSendMessage}
                                     disabled={!inputVal.trim()}
                                     aria-label="Send message"
@@ -2588,8 +2705,11 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                                                             <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-white">
                                                                 <p className="text-sm text-gray-700">Would you like to disable university moderation on your account?</p>
                                                                 <button
-                                                                    onClick={() => setShowReasonForm(true)}
-                                                                    className="text-sm font-semibold text-elm-dark hover:text-green-800 underline"
+                                                                    onClick={() => {
+                                                                        setShowReasonForm(true);
+                                                                        setDisableReasonTouched(false);
+                                                                    }}
+                                                                    className={cx("text-sm font-semibold text-elm-dark hover:text-green-800 underline", UI_STYLES.focus.ring)}
                                                                 >
                                                                     Yes, disable university moderation
                                                                 </button>
@@ -2606,24 +2726,33 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                                                                     id="disable-reason"
                                                                     value={disableReason}
                                                                     onChange={(e) => setDisableReason(e.target.value.slice(0, 400))}
-                                                                    className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-elm-dark/20 focus:border-elm-dark outline-none resize-none"
+                                                                    onBlur={() => setDisableReasonTouched(true)}
+                                                                    className={cx("w-full border border-gray-300 rounded-lg p-3 text-sm resize-none", UI_STYLES.focus.ring)}
                                                                     rows={4}
                                                                     placeholder="Enter your reason here..."
                                                                     maxLength={400}
-                                                                    aria-describedby="disable-reason-count"
+                                                                    aria-describedby="disable-reason-count disable-reason-error"
                                                                 />
                                                                 <div className="flex items-center justify-between">
-                                                                    <span id="disable-reason-count" className="text-xs text-gray-400">{disableReason.length}/400</span>
+                                                                    <span id="disable-reason-count" className="text-xs text-gray-600">{disableReason.length}/400</span>
+                                                                    {disableReasonTouched && !disableReason.trim() && (
+                                                                        <span id="disable-reason-error" className="text-xs text-red-600 font-semibold">
+                                                                            Explanation is required.
+                                                                        </span>
+                                                                    )}
                                                                     <button
                                                                         onClick={() => {
-                                                                            if (!disableReason.trim()) return;
+                                                                            if (!disableReason.trim()) {
+                                                                                setDisableReasonTouched(true);
+                                                                                return;
+                                                                            }
                                                                             setIsModerationDisabled(true);
                                                                             setIsChatLocked(false);
                                                                             setShowReasonForm(false);
                                                                             setMessages(prev => [...prev, { role: 'moderation-disabled' }]);
                                                                         }}
                                                                         disabled={!disableReason.trim()}
-                                                                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${disableReason.trim() ? 'bg-elm-dark text-white hover:bg-green-900' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                                                                        className={cx(`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${disableReason.trim() ? 'bg-elm-dark text-white hover:bg-green-900' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`, UI_STYLES.focus.ring)}
                                                                         aria-disabled={!disableReason.trim()}
                                                                     >
                                                                         Confirm &amp; disable moderation
@@ -2687,7 +2816,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                             <div className="p-4 pb-0">
                                 <textarea
                                 ref={inputRef}
-                                className={`w-full bg-transparent border-none resize-none focus:ring-0 text-gray-800 placeholder-gray-500 text-base ${isChatLocked ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                className={cx(`w-full bg-transparent border-none resize-none text-gray-800 placeholder-gray-600 text-base ${isChatLocked ? 'opacity-40 cursor-not-allowed' : ''}`, UI_STYLES.focus.ring)}
                                 placeholder={isChatLocked ? "Chat locked by moderation." : "Ask a follow up question."}
                                 aria-label="Chat input"
                                 style={{ height: `${inputHeight}px`, minHeight: '64px', maxHeight: '400px' }}
@@ -2785,7 +2914,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                                 </div>
 
                                 <button 
-                                className={`p-2 rounded-lg transition-colors ${inputVal.trim() ? 'bg-elm-dark text-white hover:bg-green-900' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                                className={cx(`p-2 rounded-lg transition-colors ${inputVal.trim() ? 'bg-elm-dark text-white hover:bg-green-900' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`, UI_STYLES.focus.ring)}
                                 onClick={handleSendMessage}
                                 disabled={!inputVal.trim()}
                                 aria-label="Send message"
@@ -2844,7 +2973,8 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                     <h3 className="font-bold text-gray-900">Attached files</h3>
                     <button 
                         onClick={() => setIsFilesSidebarOpen(false)}
-                        className="text-gray-400 hover:text-gray-600"
+                        className={cx("text-gray-600 hover:text-gray-800 min-w-[36px] min-h-[36px]", UI_STYLES.focus.ring)}
+                        aria-label="Close attached files panel"
                     >
                         <Icon name="close" size={20} />
                     </button>
@@ -2856,7 +2986,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                     </p>
                     
                     {attachedFiles.length === 0 ? (
-                        <p className="text-sm text-gray-400 italic text-center py-8">No files attached</p>
+                        <p className="text-sm text-gray-600 italic text-center py-8">No files attached</p>
                     ) : (
                         attachedFiles.map((file, idx) => (
                         <div key={idx} className="p-3 border border-gray-200 rounded-lg flex items-start gap-3 group hover:border-elm-dark/30 transition-colors">
@@ -2865,7 +2995,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                             </div>
                             <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-700 truncate">{file.name}</p>
-                            <p className="text-xs text-gray-400">{file.size} • {file.date}</p>
+                            <p className="text-xs text-gray-600">{file.size} • {file.date}</p>
                             </div>
                             <button 
                             onClick={() => removeFile(idx)}
@@ -2897,6 +3027,11 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                     className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
                     role="dialog"
                     aria-modal="true"
+                    aria-labelledby="upload-modal-title"
+                    aria-describedby="upload-modal-desc"
+                    ref={uploadDialogRef}
+                    tabIndex={-1}
+                    onKeyDown={(e) => handleDialogKeyDown(e, uploadDialogRef, () => setIsUploadModalOpen(false))}
                     >
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
                         
@@ -2906,8 +3041,8 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                             </div>
                         </div>
 
-                        <h2 className="text-xl font-bold text-center text-gray-900 mb-2">Before you upload files</h2>
-                        <p className="text-sm text-center text-gray-500 mb-6">You confirm you have the right to share these documents?</p>
+                        <h2 id="upload-modal-title" className="text-xl font-bold text-center text-gray-900 mb-2">Before you upload files</h2>
+                        <p id="upload-modal-desc" className="text-sm text-center text-gray-600 mb-6">You confirm you have the right to share these documents?</p>
 
                         <div className="bg-sky-50 border border-sky-200 rounded-lg p-4 mb-8 text-xs text-sky-800 space-y-3">
                             <p className="flex gap-2">
@@ -2928,13 +3063,13 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                         <div className="flex items-center justify-end gap-4">
                             <button 
                             onClick={() => setIsUploadModalOpen(false)}
-                            className="text-sm font-bold text-gray-600 hover:text-gray-900 px-3 py-2"
+                            className={cx("text-sm font-bold text-gray-700 hover:text-gray-900 px-3 py-2", UI_STYLES.focus.ring)}
                             >
                             Decline
                             </button>
                             <button 
                             onClick={handleAcceptUpload}
-                            className="text-sm font-bold text-elm-dark hover:text-green-800 px-3 py-2"
+                            className={cx("text-sm font-bold text-elm-dark hover:text-green-800 px-3 py-2", UI_STYLES.focus.ring)}
                             >
                             Accept
                             </button>
@@ -2948,19 +3083,25 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                     className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
                     role="dialog"
                     aria-modal="true"
+                    aria-labelledby="settings-modal-title"
+                    aria-describedby="settings-modal-desc"
+                    ref={settingsDialogRef}
+                    tabIndex={-1}
+                    onKeyDown={(e) => handleDialogKeyDown(e, settingsDialogRef, () => setIsSettingsModalOpen(false))}
                     >
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden">
                         <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-white shrink-0">
-                            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                            <h2 id="settings-modal-title" className="text-xl font-bold text-gray-900 flex items-center gap-2">
                             <Icon name="settings" size={24} className="text-elm-dark" />
                             <span>Settings</span>
                             </h2>
-                            <button onClick={() => setIsSettingsModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500">
+                            <button onClick={() => setIsSettingsModalOpen(false)} className={cx("p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500 min-w-[36px] min-h-[36px]", UI_STYLES.focus.ring)} aria-label="Close settings">
                             <Icon name="close" size={20} />
                             </button>
                         </div>
                         
                         <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+                            <p id="settings-modal-desc" className="sr-only">Configure appearance, language, and information about the application.</p>
                             <div className="w-full md:w-64 bg-gray-50 border-b md:border-b-0 md:border-r border-gray-200 overflow-x-auto md:overflow-y-auto flex md:flex-col shrink-0">
                             {SETTINGS_TABS.map((tab) => (
                                 <button
@@ -3009,8 +3150,8 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                                         <div className="space-y-2">
                                         <label className="block text-sm font-bold text-gray-700">Language</label>
                                         <div className="relative">
-                                            <Icon name="public" size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                            <select className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-elm-dark/20 focus:border-elm-dark outline-none bg-white">
+                                            <Icon name="public" size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
+                                            <select className={cx("w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-white", UI_STYLES.focus.ring)}>
                                                 <option>English (UK)</option>
                                                 <option>English (US)</option>
                                                 <option>French</option>
