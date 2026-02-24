@@ -1,0 +1,2915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ELM Chat Interface</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts (Material 3) -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Material+Symbols+Rounded:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Babel (to compile JSX in browser) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Roboto', 'sans-serif'],
+            },
+            colors: {
+              elm: {
+                dark: '#0f3d32',
+                light: '#e8eceb',
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body { font-family: 'Roboto', sans-serif; }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      .prompt-clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    </style>
+
+    <!-- Import Map: Defines where "react", "react-dom", and "lucide-react" come from -->
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/"
+  }
+}
+</script>
+</head>
+<body class="bg-[#f4f4f4]">
+    <div id="root"></div>
+
+    <!-- Main Application Script -->
+    <!-- type="text/babel" and data-type="module" allows using 'import' statements -->
+    <script type="text/babel" data-type="module" data-presets="typescript,react">
+        import React, { useState, useRef, useEffect } from 'react';
+        import { createRoot } from 'react-dom/client';
+
+        const Icon = ({ name, size = 20, className = "" }) => (
+            <span 
+                className={`material-symbols-rounded align-middle ${className}`}
+                style={{ fontSize: `${size}px` }}
+                aria-hidden="true"
+            >
+                {name}
+            </span>
+        );
+
+        const DashedChatIcon = ({ size = 20, className = "" }) => (
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                width={size}
+                height={size}
+                fill="none"
+                className={className}
+                aria-hidden="true"
+            >
+                <path
+                    d="M5 5.5h14A1.5 1.5 0 0 1 20.5 7v7a1.5 1.5 0 0 1-1.5 1.5H10l-3.5 3V14H5A1.5 1.5 0 0 1 3.5 12.5v-5A1.5 1.5 0 0 1 5 5.5Z"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeDasharray="3.5 2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+            </svg>
+        );
+
+        // --- CONSTANTS & DATA ---
+
+        const USE_CASES = [
+            {
+                id: 'admin',
+                category: "General Admin & Brainstorming",
+                icon: <Icon name="bolt" size={20} className="text-amber-500" />,
+                purpose: "For everyday tasks, quick drafts, summary emails, idea generation, and simple factual checks.",
+                models: [
+                { name: "Llama 3.3", tag: "University Host", type: "green", description: "Your Greenest choice. Use this local model first for all routine tasks to minimise cloud compute." },
+                { name: "GPT-4o mini", tag: "Fast & Efficient", type: "fast", description: "An excellent, low-impact cloud option for quick, high-quality results when Llama is unavailable." }
+                ],
+                rationale: "Prioritizes local compute for routine tasks to save energy; uses lightweight cloud models for speed."
+            },
+            {
+                id: 'coding',
+                category: "Math, Coding & Logic",
+                icon: <Icon name="calculate" size={20} className="text-blue-500" />,
+                purpose: "For problem-solving, debugging, generating clean code snippets, and precise technical or analytical outputs.",
+                models: [
+                { name: "o4 mini", tag: "Efficient Logic", type: "fast", description: "Offers the best balance of accuracy and lower energy use for most technical needs." },
+                { name: "o3", tag: "Deep Reasoning", type: "heavy", description: "Provides maximum analytical effort and deeper context for the toughest, most complex logic problems. (High compute)" }
+                ],
+                rationale: "Balances efficiency for standard code with high-compute options for complex logic."
+            },
+            {
+                id: 'research',
+                category: "Research & Document Analysis",
+                icon: <Icon name="description" size={20} className="text-emerald-500" />,
+                purpose: "For deep dives into large documents, synthesising complex reports, comparative analysis, and high-context queries.",
+                models: [
+                { name: "GPT-4 Turbo", tag: "Max Context", type: "heavy", description: "Unrivalled context window for working with vast amounts of data and large documents." },
+                { name: "GPT-5.1 Thinking", tag: "Adaptive Power", type: "heavy", description: "Uses dynamic, high power when required for complex relationships and research questions." }
+                ],
+                rationale: "High context windows and adaptive power are essential for heavy synthesis tasks."
+            },
+            {
+                id: 'creative',
+                category: "Creative Ideation & Writing",
+                icon: <Icon name="palette" size={20} className="text-purple-500" />,
+                purpose: "For generating stories, marketing copy, conversational flow, poetry, and artistic concepts.",
+                models: [
+                { name: "GPT-5.1 Instant", tag: "Natural & Creative", type: "fast", description: "Optimised for natural conversational flow and creative flair with lower cloud impact." },
+                { name: "Llama 3.3", tag: "University Host", type: "green", description: "Local & resource-friendly for drafting creative ideas and foundational storytelling." }
+                ],
+                rationale: "Optimized for nuance and flow rather than raw logic or data processing."
+            },
+            {
+                id: 'other',
+                category: "Other Tasks & Full Exploration",
+                icon: <Icon name="search" size={20} className="text-gray-500" />,
+                purpose: "For highly specialised, experimental, or non-listed use cases where a generalist model is needed.",
+                models: [
+                { name: "GPT-3.5 Turbo", tag: "Generalist Workhorse", type: "fast", description: "A solid, low-impact, fast choice for general troubleshooting or quick initial tests." }
+                ],
+                rationale: "A reliable baseline for tasks that don't fit specific specialized categories."
+            }
+        ];
+        const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        const SUPPORTED_IMAGE_LABELS = 'JPEG, PNG, WebP, GIF';
+
+        // -- Model provider groups for the quick-switch dropdown.
+        // Each group maps a provider name to its model names.
+        // "Gemini" is included but empty, ready for future models.
+        const MODEL_GROUPS = [
+            { id: 'local', label: 'Local', icon: <Icon name="dns" size={18} className="text-green-600" />, models: ['Llama 3.3'] },
+            { id: 'openai', label: 'OpenAI', icon: <Icon name="cloud" size={18} className="text-blue-500" />, models: ['GPT-4o mini', 'GPT-4 Turbo', 'GPT-3.5 Turbo', 'GPT-5.1 Thinking', 'GPT-5.1 Instant', 'o4 mini', 'o3'] },
+            { id: 'gemini', label: 'Gemini', icon: <Icon name="auto_awesome" size={18} className="text-amber-500" />, models: [] }
+        ];
+
+        // -- Models that support a "Reasoning Amount" setting.
+        // Only these models show the reasoning sub-menu in the dropdown.
+        const THINKING_MODELS = ['o3', 'o4 mini', 'GPT-5.1 Thinking'];
+
+        // -- Reasoning amount options for thinking models.
+        const REASONING_LEVELS = [
+            { id: 'none', label: 'None' },
+            { id: 'low', label: 'Low' },
+            { id: 'medium', label: 'Medium' },
+            { id: 'high', label: 'High' },
+            { id: 'extra-high', label: 'Extra-high' }
+        ];
+
+        // -- Tabs shown in the Settings modal (Model Catalog removed;
+        // model selection now lives in the dropdown + Model Guide page).
+        const SETTINGS_TABS = [
+            { id: 'general', label: 'General', icon: <Icon name="settings" size={20} /> },
+            { id: 'about', label: 'About', icon: <Icon name="info" size={20} /> },
+        ];
+
+        const MOCK_FILES = [
+            { name: "Project_Specs.pdf", size: "2.4 MB", date: "17 Jun, 10:00", type: "pdf" },
+            { name: "data_analysis.csv", size: "1.2 MB", date: "17 Jun, 10:05", type: "csv" },
+            { name: "meeting_notes.docx", size: "500 KB", date: "17 Jun, 10:10", type: "doc" },
+            { name: "requirements.txt", size: "12 KB", date: "17 Jun, 10:15", type: "txt" }
+        ];
+
+        const MOCK_FOLDERS = [
+            {
+                id: 'folder-docs',
+                name: 'Docs',
+                selectedLabel: 'selected',
+                docCount: 1,
+                size: '44.38 KB',
+                files: []
+            },
+            {
+                id: 'folder-drafts',
+                name: 'drafts',
+                selectedLabel: '1 selected',
+                docCount: 1,
+                size: '6.61 KB',
+                files: [
+                    { id: 'file-sample', name: 'sample.csv', size: '6.61 KB' }
+                ]
+            },
+            {
+                id: 'folder-ethics',
+                name: 'Image Creation - Ethics',
+                selectedLabel: 'selected',
+                docCount: 2,
+                size: '1.5 MB',
+                files: []
+            },
+            {
+                id: 'folder-rollout',
+                name: 'Rollout',
+                selectedLabel: 'selected',
+                docCount: 5,
+                size: '16.83 MB',
+                files: []
+            },
+            {
+                id: 'folder-user-data',
+                name: 'User Data',
+                selectedLabel: 'selected',
+                docCount: 1,
+                size: '3.52 MB',
+                files: []
+            }
+        ];
+
+        const MOCK_PROMPTS = [
+            {
+                id: 'elm-1',
+                title: 'Default ELM Prompt',
+                text: 'You are ELM, the University of Edinburgh\'s secure gateway to generative AI, designed to help students and staff learn and work responsibly.\n\nOperate with these principles:\n- Integrity: Do not help users submit AI output as their own assessed work. If a request looks like an assessment submission offer learning support instead.\n- Course guidance: Remind users to check course level rules for AI use when relevant.\n- Transparency: Encourage acknowledgment and citation of AI use when content is included in assessed work.\n- Verification: Do not cite AI-found sources without reading and verifying them.\n- Learning-first: Avoid replacing the user\'s own thinking; encourage critical engagement.\n- Safety and privacy: Do not request or expose sensitive data; avoid unsafe or illegal content.\n- Accuracy: Be concise, structured, and explicit about uncertainty.\n\nUse a professional, supportive tone and ask clarifying questions when needed.',
+                source: 'elm'
+            },
+            {
+                id: 'elm-2',
+                title: 'University Maths Tutor',
+                text: 'You are a non-judgemental maths tutor for undergraduate and graduate students. Your goal is to build understanding, not deliver final answers.\n\nDo not provide direct solutions. A direct solution includes a final numeric answer, a fully worked solution to the exact problem, or a final proof. Instead, guide the learner to solve it.\n\nGuidelines:\n- Ask what the learner has tried and where they are stuck.\n- Break problems into small steps and provide hints.\n- Provide worked examples on similar (not identical) problems.\n- Offer practice exercises with increasing difficulty.\n- Adapt to the learner\'s level; check understanding with short questions.\n- If the task appears assessed, ask if this is for an assessment and offer to focus on learning.\n\nWhen given a problem:\n1) Confirm topic and level.\n2) Ask for their approach.\n3) Provide guided steps and hints.\n4) Share a similar example.\n5) Offer a short exercise and invite the next step.',
+                source: 'elm'
+            },
+            {
+                id: 'elm-3',
+                title: 'Statistician',
+                text: 'You are a statistician who helps users analyze complex data. Start by asking whether they want a technical explanation (for statisticians) or a plain-language explanation (for limited experience).\n\nWhen responding:\n- Ask about the research question, data structure, variables, sample size, and assumptions.\n- State the statistical approach and justify why it fits.\n- Highlight assumptions, limitations, and potential biases.\n- Provide interpretations in the requested tone and level.\n- Suggest diagnostics, sensitivity checks, and visualizations.\n- If data are not provided, propose a clear analysis plan.\n- Do not cite AI-found sources without verification.\n\nOutput format:\n- Problem framing\n- Recommended methods\n- Assumptions and checks\n- Interpretation guidance\n- Next questions or required inputs',
+                source: 'elm'
+            },
+            {
+                id: 'elm-4',
+                title: 'Programming Tutor',
+                text: 'You are a programming tutor who supports learners across languages and paradigms. Your goal is to help learners solve problems themselves, not deliver complete solutions.\n\nDo not provide direct solutions. A direct solution includes full code that solves the exact task, a final algorithmic answer, or a complete patch. Instead, provide guidance, examples, and tests.\n\nGuidelines:\n- Ask for their goal, constraints, and current code.\n- Diagnose misunderstandings and explain concepts with small, runnable examples.\n- Provide hints, scaffolding, and test cases instead of final answers.\n- Encourage debugging strategies and reasoning about errors.\n- Adapt explanations to the learner\'s experience level and language of choice.\n- If the task appears assessed, ask if this is for an assessment and offer to focus on learning.\n\nWhen given a task:\n1) Restate the goal and constraints.\n2) Ask what they have tried and where they are stuck.\n3) Offer a minimal example or pseudocode structure.\n4) Provide one or two targeted hints.\n5) Suggest a test or edge case to validate their solution.',
+                source: 'elm'
+            },
+            {
+                id: 'elm-5',
+                title: 'Planner',
+                text: 'You are an event planner. The user provides details about an upcoming event. Your job is to ask clarifying questions, propose multiple plan options, and help them make tradeoffs.\n\nProcess:\n- Ask for date, location, audience size, budget, goals, accessibility needs, and constraints.\n- Offer 2-3 plan variants (e.g., minimal, balanced, premium) with pros/cons.\n- Provide a checklist and a timeline.\n- Flag risks and dependencies.\n- Suggest vendors or resources only if the user asks.\n- Avoid collecting sensitive personal data.\n\nOutput format:\n- Clarifying questions\n- Plan options\n- Recommended plan (with reasoning)\n- Timeline and checklist\n- Risks and contingencies',
+                source: 'elm'
+            },
+            {
+                id: 'elm-6',
+                title: 'Office Assistant',
+                text: 'You are an expert office assistant and communications specialist. You draft clear, professional messages, summarize meetings, and help organize notes.\n\nGuidelines:\n- Ask for audience, tone, and purpose (inform, persuade, request, report).\n- Keep writing concise, structured, and polite.\n- Provide versions if requested (short, standard, detailed).\n- For meetings: summarize key decisions, action items, owners, and deadlines.\n- For transcripts: only work from provided notes, audio, or a raw transcript. Do not fabricate or claim accuracy without source material. If no source is provided, offer a template and ask for the input.\n\nOutput format (adapt to request):\n- Draft message\n- Optional subject line\n- Key points / action items\n- Follow-up questions if needed',
+                source: 'elm'
+            }
+        ];
+
+        const MOCK_CHAT_HISTORY = [
+            {
+                id: 'chat-1',
+                title: "Storytelling techniques and insights",
+                updated: "18 Jun, 09:30",
+                pinned: true,
+                length: "12 KB",
+                snippet: "Explored narrative structures, audience hooks, and pacing tips for presentations.",
+                messages: [
+                    { role: 'user', content: "Give me storytelling techniques to make presentations engaging and memorable." },
+                    { role: 'assistant', content: "Here are five techniques: start with a relatable hook, use contrast, add vivid sensory details, keep a clean arc (setup, tension, resolution), and close with a call to action." }
+                ]
+            },
+            {
+                id: 'chat-2',
+                title: "Recent coding challenges and solutions",
+                updated: "17 Jun, 16:05",
+                pinned: false,
+                length: "9 KB",
+                snippet: "Debugged API response handling and clarified error messaging strategy.",
+                messages: [
+                    { role: 'user', content: "Help me debug why my API responses are timing out intermittently." },
+                    { role: 'assistant', content: "Check connection pooling limits, add retries with jitter, and log upstream latency to isolate the bottleneck. Also verify that keep-alive headers are set." }
+                ]
+            },
+            {
+                id: 'chat-3',
+                title: "Research findings from last session",
+                updated: "17 Jun, 11:40",
+                pinned: false,
+                length: "7 KB",
+                snippet: "Summarised key sources and grouped insights by research question.",
+                messages: [
+                    { role: 'user', content: "Summarise the three sources we reviewed for the survey design project." },
+                    { role: 'assistant', content: "Key takeaways: prioritize clear sampling frames, pretest Likert questions, and align demographic breakouts with research hypotheses." }
+                ]
+            },
+            {
+                id: 'chat-4',
+                title: "Latest scientific advancements overview",
+                updated: "16 Jun, 15:20",
+                pinned: false,
+                length: "6 KB",
+                snippet: "Quick scan across biology, physics, and climate tech announcements.",
+                messages: [
+                    { role: 'user', content: "Give me a digest of notable scientific announcements this week." },
+                    { role: 'assistant', content: "Highlights include a new room-temperature semiconductor, improved perovskite stability, and promising CRISPR delivery work in-vivo." }
+                ]
+            }
+        ];
+
+        const LOREM_IPSUM_RESPONSE = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit euismod. Pellentesque et blandit nunc, ultricies aliquam lectus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit euismod. Pellentesque et blandit nunc, ultricies aliquam lectus.
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit euismod. Pellentesque et blandit nunc, ultricies aliquam lectus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit euismod. Pellentesque et blandit nunc, ultricies aliquam lectus. Etiam finibus blandit euismod. Pellentesque et blandit nunc, ultricies aliquam lectus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit euismod. Pellentesque et blandit nunc, ultricies aliquam lectus.`;
+
+        const cx = (...classes) => classes.filter(Boolean).join(' ');
+
+        const UI_STYLES = {
+            button: {
+                primary: "flex items-center gap-2 bg-elm-dark hover:bg-green-900 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm",
+                primaryCompact: "flex items-center gap-2 bg-elm-dark hover:bg-green-900 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors shadow-sm text-sm",
+                icon: "p-2 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors",
+                chip: "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-green-900 hover:text-white hover:border-green-900 rounded-md transition-colors border border-gray-200",
+                selectorBase: "flex items-center gap-2 border rounded-lg px-3 py-1.5 transition-all font-medium max-w-[220px] sm:max-w-xs",
+                selectorInactive: "bg-white/50 border-gray-400 text-elm-dark hover:bg-white hover:shadow-sm",
+                selectorActive: "bg-elm-dark border-elm-dark text-white shadow-sm"
+            },
+            surface: {
+                panel: "flex-1 flex flex-col h-full bg-white md:m-4 md:rounded-2xl shadow-sm border border-gray-200 overflow-hidden relative"
+            },
+            inputShell: "bg-[#e8e8e8] rounded-2xl shadow-inner relative",
+            prompt: {
+                card: "border border-gray-200 rounded-xl bg-white hover:border-elm-dark hover:shadow-md transition-all p-5 flex flex-col gap-3",
+                badge: "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide border",
+                action: "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors",
+                text: "text-sm text-gray-600 leading-relaxed"
+            },
+            infoBubble: "border border-blue-300 bg-blue-50 text-blue-900 rounded-xl px-4 py-3 text-sm flex items-start gap-2"
+            ,
+            folder: {
+                headerRow: "flex items-center justify-between gap-4",
+                summaryText: "text-sm text-gray-600",
+                limitCard: "border border-gray-200 rounded-xl bg-white p-4 w-full max-w-[320px] shadow-sm",
+                limitLabel: "text-sm font-semibold text-gray-900",
+                limitBar: "mt-2 h-1.5 w-full rounded-full bg-gray-200 overflow-hidden",
+                limitBarFill: "h-full rounded-full bg-elm-dark",
+                listCard: "bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden",
+                listRow: "flex items-center justify-between gap-4 px-5 py-4 border-b border-gray-200",
+                listRowButton: "w-full text-left",
+                listRowMeta: "flex flex-wrap items-center gap-3 text-xs text-gray-500",
+                listRowMetaItem: "flex items-center gap-1.5",
+                listRowStatus: "text-xs font-medium text-gray-500",
+                listRowHeader: "flex items-center gap-3",
+                listRowName: "text-sm font-semibold text-gray-900",
+                listExpanded: "px-5 py-4 bg-white",
+                fileRow: "flex items-center justify-between gap-3 py-2",
+                fileInfo: "flex items-center gap-3 text-sm text-gray-700",
+                fileName: "font-medium text-gray-900",
+                fileSize: "text-xs text-gray-500",
+                actionRow: "flex items-center justify-end gap-6 pt-4 border-t border-gray-200",
+                actionLink: "flex items-center gap-2 text-sm font-semibold",
+                actionEdit: "text-elm-dark hover:text-green-900",
+                actionDelete: "text-red-600 hover:text-red-700",
+                addButton: "flex items-center gap-2 bg-elm-dark hover:bg-green-900 text-white px-4 py-2 rounded-lg font-semibold transition-colors shadow-sm",
+                uploadBox: "border border-dashed border-gray-300 rounded-xl bg-[#f5f5f5] px-6 py-8 text-center space-y-3",
+                uploadTitle: "text-base font-semibold text-gray-900",
+                uploadHint: "text-sm text-gray-600",
+                uploadMeta: "text-xs text-gray-500",
+                uploadButton: "inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-elm-dark bg-white hover:bg-gray-50 transition-colors",
+                infoCallout: "border border-blue-200 bg-blue-50 text-blue-900 rounded-xl px-4 py-3 text-sm flex items-start gap-2",
+                existingDocs: "border border-dashed border-gray-300 rounded-xl px-4 py-3 flex items-center justify-between"
+            },
+            // -- Styles for the model quick-switch dropdown popover.
+            modelDropdown: {
+                overlay: "fixed inset-0 z-40",
+                panel: "absolute bottom-full left-0 mb-2 w-72 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50 origin-bottom-left max-h-[70vh] overflow-y-auto",
+                mobileOverlay: "fixed inset-0 z-40 bg-black/40",
+                mobilePanel: "fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-2xl shadow-2xl max-h-[80vh] overflow-y-auto",
+                groupLabel: "px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2",
+                item: "w-full flex items-center justify-between gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-100 transition-colors text-left",
+                itemActive: "text-elm-dark font-semibold",
+                check: "text-elm-dark",
+                subMenuTrigger: "text-gray-400",
+                footer: "border-t border-gray-200 px-4 py-3"
+            },
+            // -- Styles for the Model Guide full-page view.
+            modelGuide: {
+                card: "border border-gray-200 rounded-xl bg-white hover:border-elm-dark hover:shadow-md transition-all p-5 flex flex-col gap-3",
+                tagGreen: "bg-green-50 text-green-700 border-green-200",
+                tagFast: "bg-blue-50 text-blue-600 border-blue-200",
+                tagHeavy: "bg-orange-50 text-orange-600 border-orange-200"
+            }
+        };
+
+        // --- COMPONENTS ---
+
+        // 1. SIDEBAR COMPONENT
+        const Sidebar = ({ isOpen, onClose, currentView, onNavigate }) => {
+            const handleNavClick = (view) => {
+                if (onNavigate) {
+                    onNavigate(view);
+                }
+            };
+
+            const NavItem = ({ icon, label, isActive, onClick }) => (
+                <button 
+                    onClick={onClick}
+                    className={`
+                    w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm font-medium
+                    ${isActive ? 'bg-[#dcdcdc] text-elm-dark font-semibold' : 'text-gray-600 hover:bg-gray-200'}
+                    `}
+                >
+                    {icon}
+                    <span>{label}</span>
+                </button>
+            );
+
+            const RecentChatTitle = ({ title, onClick }) => (
+                <li>
+                    <button onClick={onClick} className="w-full text-left text-sm text-gray-600 hover:text-elm-dark truncate transition-colors">
+                    {title}
+                    </button>
+                </li>
+            );
+
+            return (
+                <aside 
+                className={`
+                    fixed md:static inset-y-0 left-0 z-30
+                    w-[280px] bg-[#ebebeb] border-r border-gray-200
+                    flex flex-col transition-transform duration-300 ease-in-out
+                    ${isOpen ? 'translate-x-0' : '-translate-x-full md:hidden'}
+                `}
+                aria-label="Main Navigation"
+                >
+                    <div className="p-4 md:p-6 pb-2">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2 text-elm-dark">
+                                <Icon name="park" size={28} className="text-elm-dark" />
+                                <span className="text-3xl font-bold tracking-tight">ELM</span>
+                            </div>
+                            <button 
+                                onClick={onClose}
+                                className="p-1 rounded-md hover:bg-gray-200 md:hidden"
+                                aria-label="Close sidebar"
+                            >
+                                <Icon name="close" size={24} className="text-gray-600" />
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-1 text-xs text-gray-500 mb-6 pl-1">
+                            <span>Proudly developed by:</span>
+                            <span className="font-semibold text-gray-700 tracking-wide">EDINA</span>
+                        </div>
+
+                        <button 
+                            onClick={() => handleNavClick('chat')}
+                            className="w-full flex items-center justify-center gap-2 bg-[#dcdcdc] hover:bg-[#d0d0d0] text-gray-700 py-3 rounded-lg transition-colors font-medium border border-transparent focus:ring-2 focus:ring-elm-dark/20 focus:outline-none"
+                            aria-label="Start a new chat"
+                        >
+                            <div className="relative">
+                                <Icon name="chat" size={18} className="absolute -left-1 -top-1" />
+                                <div className="w-2 h-2 bg-transparent"></div>
+                            </div>
+                            <span>New chat</span>
+                        </button>
+                    </div>
+
+                    <nav className="px-4 py-2 space-y-1">
+                    <NavItem
+                            icon={<Icon name="bolt" size={20} className="text-amber-500" />}
+                            label="Prompts"
+                            isActive={currentView === 'prompts'}
+                            onClick={() => handleNavClick('prompts')}
+                        />
+                        <NavItem
+                            icon={<Icon name="menu_book" size={20} className="text-blue-500" />}
+                            label="Model Guide"
+                            isActive={currentView === 'model-guide'}
+                            onClick={() => handleNavClick('model-guide')}
+                        />
+                        <NavItem
+                            icon={<Icon name="folder" size={20} />}
+                            label="Folders"
+                            isActive={currentView === 'folders'}
+                            onClick={() => handleNavClick('folders')}
+                        />
+                        <NavItem 
+                            icon={<Icon name="history" size={20} />} 
+                            label="Chat history" 
+                            isActive={currentView === 'history'}
+                            onClick={() => handleNavClick('history')} 
+                        />
+                    </nav>
+
+                    <hr className="my-4 border-gray-300 mx-6" />
+
+                    <div className="flex-1 overflow-y-auto px-6 py-2">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Recent chats</h3>
+                        <ul className="space-y-3">
+                            <RecentChatTitle title="Storytelling techniques and insig..." onClick={() => handleNavClick('chat')} />
+                            <RecentChatTitle title="Recent coding challenges and so..." onClick={() => handleNavClick('chat')} />
+                            <RecentChatTitle title="Research findings from last sessi..." onClick={() => handleNavClick('chat')} />
+                            <RecentChatTitle title="Latest scientific advancements o..." onClick={() => handleNavClick('chat')} />
+                        </ul>
+                    </div>
+
+                    <div className="p-6 mt-auto">
+                        <div className="flex items-center gap-3 opacity-80">
+                            <div className="w-10 h-10 rounded-full border border-gray-400 flex items-center justify-center bg-white">
+                                <span className="font-serif font-bold text-xs text-center leading-none text-black">UNIV</span>
+                            </div>
+                            <div className="flex flex-col text-elm-dark leading-tight">
+                                <span className="text-xs font-serif">THE UNIVERSITY</span>
+                                <span className="text-xs font-serif italic">of</span>
+                                <span className="text-sm font-serif font-bold">EDINBURGH</span>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+            );
+        };
+
+        // 2. HELPER COMPONENTS
+        const DropdownItem = ({ icon, label }) => (
+            <button 
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-200/80 transition-colors text-left"
+                role="menuitem"
+            >
+                <span className="text-gray-500">{icon}</span>
+                <span>{label}</span>
+            </button>
+        );
+
+        const CopyButton = ({ text, className }) => {
+            const [copied, setCopied] = useState(false);
+            
+            const handleCopy = async () => {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                } catch (err) {
+                    console.error('Failed to copy', err);
+                }
+            };
+
+            return (
+                <button 
+                    onClick={handleCopy}
+                    className={`p-1.5 bg-white border border-gray-200 rounded-full text-gray-400 hover:text-gray-600 shadow-sm transition-all ${className}`}
+                    title="Copy"
+                >
+                    {copied ? <Icon name="check" size={14} className="text-green-500" /> : <Icon name="content_copy" size={14} />}
+                </button>
+            );
+        };
+
+        // 3. MAIN AREA COMPONENT
+        const MainArea = ({ isSidebarOpen, toggleSidebar, currentView = 'chat', onNavigate }) => {
+            const [activeDropdown, setActiveDropdown] = useState(null);
+            const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+            const [activeSettingsTab, setActiveSettingsTab] = useState('general');
+            
+            // File Upload State
+            const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+            const [attachedFiles, setAttachedFiles] = useState([]);
+            const [isFilesSidebarOpen, setIsFilesSidebarOpen] = useState(false);
+
+            // Folders State
+            const [folderView, setFolderView] = useState('list');
+            const [folders, setFolders] = useState(MOCK_FOLDERS);
+            const [activeFolderId, setActiveFolderId] = useState(MOCK_FOLDERS[1]?.id || MOCK_FOLDERS[0]?.id || null);
+
+            // Chat History State
+            const [chatHistory, setChatHistory] = useState(MOCK_CHAT_HISTORY);
+            const [editingHistoryId, setEditingHistoryId] = useState(null);
+            const [editingTitle, setEditingTitle] = useState("");
+
+            // Prompts State
+            const [prompts, setPrompts] = useState(MOCK_PROMPTS);
+            const [promptFilter, setPromptFilter] = useState('all');
+            const [isPromptModalOpen, setIsPromptModalOpen] = useState(false);
+            const [promptDraft, setPromptDraft] = useState({ title: '', text: '' });
+            const [expandedPrompts, setExpandedPrompts] = useState({});
+
+            // Mobile sheets
+            const [mobileSheet, setMobileSheet] = useState(null);
+
+            // Chat State
+            const [inputVal, setInputVal] = useState("");
+            const [displayModelText, setDisplayModelText] = useState("Model: Llama 3.3");
+            const [selectedModelName, setSelectedModelName] = useState("Llama 3.3");
+            const [isWebSearchEnabled, setIsWebSearchEnabled] = useState(false);
+            const [toastMessage, setToastMessage] = useState("");
+            const [messages, setMessages] = useState([]);
+            const [hasChatStarted, setHasChatStarted] = useState(false);
+            const [inputHeight, setInputHeight] = useState(64);
+            const [isEphemeralChat, setIsEphemeralChat] = useState(false);
+
+            // Model Dropdown State -- controls the quick-switch popover
+            const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+            // Reasoning amount for thinking models (o3, o4 mini, GPT-5.1 Thinking)
+            const [selectedReasoningAmount, setSelectedReasoningAmount] = useState('medium');
+            // Which thinking model's reasoning sub-menu is currently shown
+            const [reasoningSubMenuModel, setReasoningSubMenuModel] = useState(null);
+            // Filter for the Model Guide full-page view
+            const [modelGuideFilter, setModelGuideFilter] = useState('all');
+
+            const messagesEndRef = useRef(null);
+            const modelDropdownRef = useRef(null);
+            const chatContainerRef = useRef(null);
+            const inputRef = useRef(null);
+            const imageInputRef = useRef(null);
+            const resizingRef = useRef(false);
+            const startYRef = useRef(0);
+            const startHeightRef = useRef(0);
+
+            useEffect(() => {
+                if (messagesEndRef.current) {
+                messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+                }
+            }, [messages]);
+
+            // Close the model dropdown whenever the user navigates to a different page
+            useEffect(() => {
+                setIsModelDropdownOpen(false);
+                setReasoningSubMenuModel(null);
+            }, [currentView]);
+
+            // Close model dropdown on Escape key
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (e.key === 'Escape' && isModelDropdownOpen) {
+                        setIsModelDropdownOpen(false);
+                        setReasoningSubMenuModel(null);
+                    }
+                };
+                if (isModelDropdownOpen) {
+                    document.addEventListener('keydown', handleKeyDown);
+                    return () => document.removeEventListener('keydown', handleKeyDown);
+                }
+            }, [isModelDropdownOpen]);
+
+            const toggleDropdown = (e, name) => {
+                e.stopPropagation();
+                setActiveDropdown(activeDropdown === name ? null : name);
+            };
+
+            const closeDropdowns = () => setActiveDropdown(null);
+
+            const handleUploadClick = () => {
+                setActiveDropdown(null);
+                setIsUploadModalOpen(true);
+            };
+
+            const handleAcceptUpload = () => {
+                setIsUploadModalOpen(false);
+                setAttachedFiles(MOCK_FILES);
+            };
+
+            const toggleEphemeralChat = () => {
+                setIsEphemeralChat((prev) => !prev);
+                setActiveDropdown(null);
+            };
+
+            const modelSupportsImages = (modelName) => modelName !== 'Llama 3.3';
+            const imageSupportMessage = `${selectedModelName} does not support image query. Try a different model.`;
+
+            const pushInfoMessage = (content) => {
+                setMessages(prev => [...prev, { role: 'info', content }]);
+                setHasChatStarted(true);
+            };
+
+            const handleImageFiles = (fileList) => {
+                const files = Array.from(fileList || []);
+                if (!files.length) return;
+
+                if (!modelSupportsImages(selectedModelName)) {
+                    pushInfoMessage(`${selectedModelName} does not support image query. Try changing to a different model.`);
+                    return;
+                }
+
+                const unsupported = files.filter(file => !SUPPORTED_IMAGE_TYPES.includes(file.type));
+                if (unsupported.length) {
+                    pushInfoMessage(`Unsupported file type detected. Supported image types: ${SUPPORTED_IMAGE_LABELS}.`);
+                    return;
+                }
+
+                files.forEach((file) => {
+                    pushInfoMessage(`Responsible Image Use with ELM
+When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
+<br> Source: Where is it from? - Legal use and credibility\n\n
+<br> License: Is it cleared for use? - Avoids infringement\n\n
+<br> Bias: Does it stereotype? - Ensures fairness\n\n
+<br> Storage: Is it from a secure system? - Data protection/GDPR
+<br> Use: Is it AI-generated/altered? - Declare manipulations
+<br> Accessibility: Is alt-text added? - Inclusion for all`);
+                });
+            };
+
+            const handleImageUploadClick = () => {
+                if (imageInputRef.current) {
+                    imageInputRef.current.click();
+                }
+            };
+
+            const showToast = (message) => {
+                setToastMessage(message);
+                setTimeout(() => setToastMessage(""), 2000);
+            };
+
+            const removeFile = (index) => {
+                const newFiles = [...attachedFiles];
+                newFiles.splice(index, 1);
+                setAttachedFiles(newFiles);
+            };
+
+            const handleNavigateToFolders = () => {
+                if (onNavigate) {
+                onNavigate('folders');
+                setFolderView('list');
+                setActiveDropdown(null);
+                }
+            };
+
+            const togglePinHistory = (id) => {
+                setChatHistory(prev => prev.map(item => item.id === id ? { ...item, pinned: !item.pinned } : item));
+            };
+
+            const startEditingHistory = (history) => {
+                setEditingHistoryId(history.id);
+                setEditingTitle(history.title);
+            };
+
+            const saveEditingHistory = () => {
+                if (!editingHistoryId) return;
+                setChatHistory(prev => prev.map(item => 
+                    item.id === editingHistoryId 
+                    ? { ...item, title: editingTitle.trim() || item.title } 
+                    : item
+                ));
+                setEditingHistoryId(null);
+                setEditingTitle("");
+            };
+
+            const cancelEditingHistory = () => {
+                setEditingHistoryId(null);
+                setEditingTitle("");
+            };
+
+            const deleteHistory = (id) => {
+                setChatHistory(prev => prev.filter(item => item.id !== id));
+            };
+
+            const downloadHistory = (history) => {
+                const transcript = (history.messages || []).map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join('\n\n');
+                const blob = new Blob([`Title: ${history.title}\nUpdated: ${history.updated}\n\n${transcript}`], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${history.title.replace(/[^a-z0-9]+/gi, '_') || 'chat'}.txt`;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 1500);
+            };
+
+            const openHistory = (history) => {
+                setMessages(history.messages || []);
+                setHasChatStarted(true);
+                setInputVal("");
+                if (onNavigate) {
+                onNavigate('chat');
+                }
+            };
+
+            const openPromptModal = (seedPrompt = null) => {
+                if (seedPrompt) {
+                    setPromptDraft({
+                        title: `${seedPrompt.title} (copy)`,
+                        text: seedPrompt.text
+                    });
+                } else {
+                    setPromptDraft({ title: '', text: '' });
+                }
+                setIsPromptModalOpen(true);
+            };
+
+            const closePromptModal = () => {
+                setIsPromptModalOpen(false);
+                setPromptDraft({ title: '', text: '' });
+            };
+
+            const savePrompt = () => {
+                const title = promptDraft.title.trim();
+                const text = promptDraft.text.trim();
+                if (!title || !text) return;
+                const newPrompt = {
+                    id: `user-${Date.now()}`,
+                    title,
+                    text,
+                    source: 'user'
+                };
+                setPrompts(prev => [newPrompt, ...prev]);
+                setPromptFilter('my');
+                closePromptModal();
+            };
+
+            const usePrompt = (prompt) => {
+                setInputVal(prompt.text);
+                setHasChatStarted(false);
+                if (onNavigate) {
+                onNavigate('chat');
+                }
+            };
+
+            const togglePromptExpanded = (id) => {
+                setExpandedPrompts(prev => ({ ...prev, [id]: !prev[id] }));
+            };
+
+            const handleSendMessage = () => {
+                if (!inputVal.trim()) return;
+
+                const userMsg = inputVal;
+                setInputVal("");
+                setHasChatStarted(true);
+                
+                setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+
+                setTimeout(() => {
+                setMessages(prev => [...prev, { role: 'assistant', content: LOREM_IPSUM_RESPONSE }]);
+                }, 600);
+            };
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+                }
+            };
+
+            const copyToClipboard = async (text) => {
+                try {
+                    await navigator.clipboard.writeText(text);
+                } catch (err) {
+                    console.error('Failed to copy', err);
+                }
+            };
+
+            const handleMouseDown = (e) => {
+                resizingRef.current = true;
+                e.preventDefault();
+                startYRef.current = e.clientY;
+                startHeightRef.current = inputHeight;
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+            };
+
+            const handleMouseMove = (e) => {
+                if (resizingRef.current) {
+                    const delta = e.clientY - startYRef.current;
+                    const newHeight = startHeightRef.current + delta;
+                    
+                    if (newHeight > 64 && newHeight < 600) {
+                        setInputHeight(newHeight);
+                    }
+                }
+            };
+
+            const handleMouseUp = () => {
+                resizingRef.current = false;
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+            };
+
+            const allModels = USE_CASES.flatMap(uc => uc.models.map(m => ({ ...m, category: uc.category })));
+
+            // -- Deduplicated model list (Llama 3.3 appears in two use-cases).
+            // Used by the dropdown and Model Guide so each model only shows once.
+            const uniqueModels = allModels.filter((model, idx, arr) =>
+                arr.findIndex(m => m.name === model.name) === idx
+            );
+
+            // ===============================================================
+            // MODEL DROPDOWN POPOVER
+            // Renders when the user clicks the model button in the chat input.
+            // Groups models by provider (Local / OpenAI / Gemini) with a
+            // reasoning-amount sub-menu for thinking models.
+            // ===============================================================
+            const renderModelDropdown = () => {
+                if (!isModelDropdownOpen) return null;
+
+                // Detect small screens so we can render a bottom sheet instead
+                const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+
+                // Build the inner content (shared between popover and bottom sheet)
+                const dropdownContent = (
+                    <div role="listbox" aria-label="Select a model">
+                        {MODEL_GROUPS.map(group => {
+                            // Look up full model data for each name in this group
+                            const groupModels = group.models
+                                .map(name => uniqueModels.find(m => m.name === name))
+                                .filter(Boolean);
+
+                            return (
+                                <div key={group.id} role="group" aria-label={group.label}>
+                                    {/* Provider group header (e.g. "Local", "OpenAI") */}
+                                    <div className={UI_STYLES.modelDropdown.groupLabel}>
+                                        {group.icon}
+                                        <span>{group.label}</span>
+                                    </div>
+
+                                    {/* Show "Coming soon" for empty groups like Gemini */}
+                                    {groupModels.length === 0 ? (
+                                        <p className="px-4 py-2 text-xs text-gray-400 italic">Coming soon</p>
+                                    ) : (
+                                        groupModels.map(model => {
+                                            const isSelected = selectedModelName === model.name;
+                                            const isThinking = THINKING_MODELS.includes(model.name);
+                                            // Sub-menu is visible when user clicks a thinking model
+                                            const showSubMenu = isThinking && reasoningSubMenuModel === model.name;
+
+                                            return (
+                                                <div key={model.name}>
+                                                    {/* Model row -- clicking selects this model.
+                                                        For thinking models, clicking also toggles the reasoning sub-menu. */}
+                                                    <button
+                                                        role="option"
+                                                        aria-selected={isSelected}
+                                                        onClick={() => {
+                                                            setSelectedModelName(model.name);
+                                                            setDisplayModelText(`Model: ${model.name}`);
+                                                            if (isThinking) {
+                                                                // Toggle the reasoning sub-menu open/closed
+                                                                setReasoningSubMenuModel(prev => prev === model.name ? null : model.name);
+                                                            } else {
+                                                                setIsModelDropdownOpen(false);
+                                                            }
+                                                        }}
+                                                        className={cx(
+                                                            UI_STYLES.modelDropdown.item,
+                                                            isSelected && UI_STYLES.modelDropdown.itemActive
+                                                        )}
+                                                    >
+                                                        <span className="flex items-center gap-2">
+                                                            {/* Checkmark for currently selected model */}
+                                                            {isSelected
+                                                                ? <Icon name="check" size={16} className={UI_STYLES.modelDropdown.check} />
+                                                                : <span className="w-4" />}
+                                                            <span>{model.name}</span>
+                                                        </span>
+                                                        {/* Arrow indicates a reasoning sub-menu is available;
+                                                            rotates when the sub-menu is open */}
+                                                        {isThinking && (
+                                                            <Icon name={showSubMenu ? "expand_more" : "chevron_right"} size={16} className={UI_STYLES.modelDropdown.subMenuTrigger} />
+                                                        )}
+                                                    </button>
+
+                                                    {/* Reasoning Amount sub-panel -- shown inline below the model
+                                                        when the user clicks a thinking model (works on both desktop and mobile) */}
+                                                    {showSubMenu && (
+                                                        <div className="px-4 py-2.5 bg-gray-50 border-t border-b border-gray-100">
+                                                            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">
+                                                                Reasoning Amount
+                                                            </p>
+                                                            {REASONING_LEVELS.map(level => (
+                                                                <button
+                                                                    key={level.id}
+                                                                    onClick={() => {
+                                                                        setSelectedReasoningAmount(level.id);
+                                                                        setSelectedModelName(model.name);
+                                                                        setDisplayModelText(`Model: ${model.name}`);
+                                                                        setIsModelDropdownOpen(false);
+                                                                        setReasoningSubMenuModel(null);
+                                                                    }}
+                                                                    className={cx(
+                                                                        "w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 hover:bg-gray-200 rounded-lg transition-colors text-left",
+                                                                        selectedReasoningAmount === level.id && selectedModelName === model.name && 'text-elm-dark font-semibold bg-white'
+                                                                    )}
+                                                                >
+                                                                    <span>{level.label}</span>
+                                                                    {selectedReasoningAmount === level.id && selectedModelName === model.name && (
+                                                                        <Icon name="check" size={14} className="text-elm-dark" />
+                                                                    )}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        {/* Footer link to the full Model Guide page */}
+                        <div className={UI_STYLES.modelDropdown.footer}>
+                            <button
+                                onClick={() => {
+                                    setIsModelDropdownOpen(false);
+                                    onNavigate && onNavigate('model-guide');
+                                }}
+                                className="flex items-center gap-2 text-sm font-semibold text-elm-dark hover:underline w-full"
+                            >
+                                <Icon name="menu_book" size={16} />
+                                Learn more about the models
+                            </button>
+                        </div>
+                    </div>
+                );
+
+                // Mobile: render as a bottom sheet
+                if (isMobile) {
+                    return (
+                        <>
+                            <div className={UI_STYLES.modelDropdown.mobileOverlay} onClick={() => setIsModelDropdownOpen(false)} />
+                            <div className={UI_STYLES.modelDropdown.mobilePanel}>
+                                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+                                    <h3 className="text-base font-bold text-gray-900">Select a model</h3>
+                                    <button onClick={() => setIsModelDropdownOpen(false)} className="p-1 hover:bg-gray-100 rounded-full">
+                                        <Icon name="close" size={20} className="text-gray-500" />
+                                    </button>
+                                </div>
+                                {dropdownContent}
+                            </div>
+                        </>
+                    );
+                }
+
+                // Desktop: render as a fixed-position popover above the button.
+                // We use fixed positioning so the dropdown escapes any
+                // overflow-hidden ancestors that would clip it.
+                const btnRect = modelDropdownRef.current?.getBoundingClientRect();
+                const popoverStyle = btnRect ? {
+                    position: 'fixed',
+                    left: `${btnRect.left}px`,
+                    bottom: `${window.innerHeight - btnRect.top + 8}px`,
+                    zIndex: 50
+                } : {};
+
+                return (
+                    <>
+                        <div className={UI_STYLES.modelDropdown.overlay} onClick={() => setIsModelDropdownOpen(false)} />
+                        <div className="w-72 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden max-h-[70vh] overflow-y-auto" style={popoverStyle}>
+                            {dropdownContent}
+                        </div>
+                    </>
+                );
+            };
+
+            const renderMobileSheet = () => {
+                if (!mobileSheet) return null;
+                const isResponsible = mobileSheet === 'responsible-ai';
+                const isSupport = mobileSheet === 'support';
+                const isAccount = mobileSheet === 'account';
+                const title = isResponsible ? 'Responsible AI' : isSupport ? 'Support' : 'Account';
+                const headerIcon = isResponsible ? 'info' : isSupport ? 'help' : 'account_circle';
+                const options = isResponsible 
+                ? [
+                    { icon: 'menu_book', label: 'AI Principles' },
+                    { icon: 'lock', label: 'Safety Guidelines' },
+                    { icon: 'description', label: 'Privacy Policy' },
+                  ]
+                : isSupport
+                ? [
+                    { icon: 'open_in_new', label: 'Help Center' },
+                    { icon: 'mail', label: 'Contact Us' },
+                    { icon: 'description', label: 'FAQs' },
+                  ]
+                : [
+                    { 
+                        icon: 'settings', 
+                        label: 'Settings',
+                        onClick: () => { 
+                            setActiveSettingsTab('general'); 
+                            setIsSettingsModalOpen(true); 
+                        }
+                    },
+                    { icon: 'chat', label: 'Send feedback' },
+                    { icon: 'shield', label: 'Admin' },
+                  ];
+
+                return (
+                <div className="fixed inset-0 z-50 sm:hidden" aria-modal="true" role="dialog">
+                    <button className="absolute inset-0 bg-black/40" onClick={() => setMobileSheet(null)} aria-label="Close menu" />
+                    <div className="absolute inset-x-0 bottom-0 bg-white rounded-t-2xl shadow-2xl p-4 pb-6">
+                        <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <Icon name={headerIcon} size={20} />
+                            <span className="text-base font-semibold text-gray-900">{title}</span>
+                        </div>
+                        <button className="p-2 rounded-full text-gray-500 hover:bg-gray-100" onClick={() => setMobileSheet(null)} aria-label="Close">
+                            <Icon name="close" size={20} />
+                        </button>
+                        </div>
+                        <div className="space-y-2">
+                        {options.map((opt, idx) => (
+                            <button 
+                            key={idx}
+                            onClick={() => {
+                                if (opt.onClick) {
+                                    opt.onClick();
+                                }
+                                setMobileSheet(null);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 text-left"
+                            >
+                            <Icon name={opt.icon} size={20} className="text-gray-600" />
+                            <span className="text-sm font-medium text-gray-800">{opt.label}</span>
+                            </button>
+                        ))}
+                        </div>
+                    </div>
+                </div>
+                );
+            };
+
+            if (currentView === 'prompts') {
+                const promptTabs = [
+                    { id: 'all', label: 'All prompts' },
+                    { id: 'elm', label: 'ELM prompts' },
+                    { id: 'my', label: 'My prompts' }
+                ];
+                const filteredPrompts = prompts.filter((prompt) => {
+                    if (promptFilter === 'elm') return prompt.source === 'elm';
+                    if (promptFilter === 'my') return prompt.source === 'user';
+                    return true;
+                });
+
+                return (
+                <main className={UI_STYLES.surface.panel}>
+                    <header className="flex items-center px-6 py-4 border-b border-transparent">
+                    <div className="flex items-center gap-3">
+                        <button 
+                        onClick={(e) => { e.stopPropagation(); toggleSidebar(); }}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-400 text-sm font-semibold text-elm-dark hover:bg-gray-50 transition-colors"
+                        >
+                        {isSidebarOpen ? <Icon name="close" size={20} /> : <Icon name="menu" size={20} />}
+                        <span>{isSidebarOpen ? "Close" : "Tools"}</span>
+                        </button>
+                    </div>
+                    <div className="flex items-center gap-2 sm:gap-4 text-sm text-gray-600 font-medium ml-auto">
+                        <button 
+                        className={cx(UI_STYLES.button.icon, 'sm:hidden')} 
+                        aria-label="Responsible AI"
+                        onClick={() => setMobileSheet('responsible-ai')}
+                        >
+                        <Icon name="info" size={18} />
+                        </button>
+                        <button 
+                        className={cx(UI_STYLES.button.icon, 'sm:hidden')} 
+                        aria-label="Help"
+                        onClick={() => setMobileSheet('support')}
+                        >
+                        <Icon name="help" size={18} />
+                        </button>
+                        <button 
+                        className={cx(UI_STYLES.button.icon, 'sm:hidden')} 
+                        aria-label="Account"
+                        onClick={() => setMobileSheet('account')}
+                        >
+                        <Icon name="account_circle" size={18} />
+                        </button>
+                        <button 
+                        className={cx(UI_STYLES.button.icon, 'sm:hidden')} 
+                        aria-label="Account"
+                        onClick={() => setMobileSheet('account')}
+                        >
+                        <Icon name="account_circle" size={18} />
+                        </button>
+
+                        <div className="relative hidden sm:block">
+                        <button 
+                            onClick={(e) => toggleDropdown(e, 'responsible-ai')}
+                            className={`flex items-center gap-1.5 cursor-pointer hover:text-elm-dark transition-colors ${activeDropdown === 'responsible-ai' ? 'text-elm-dark' : ''}`}
+                        >
+                            <Icon name="info" size={18} />
+                            <span>Responsible AI</span>
+                        </button>
+                        {activeDropdown === 'responsible-ai' && (
+                            <div className="absolute top-full right-0 mt-2 w-56 bg-[#ebebeb] rounded-lg shadow-xl border border-gray-200 py-1 overflow-hidden z-30 origin-top-right">
+                                <DropdownItem icon={<Icon name="menu_book" size={18} />} label="AI Principles" />
+                                <DropdownItem icon={<Icon name="lock" size={18} />} label="Safety Guidelines" />
+                                <DropdownItem icon={<Icon name="description" size={18} />} label="Privacy Policy" />
+                            </div>
+                        )}
+                        </div>
+
+                        <div className="relative hidden sm:block">
+                        <button 
+                            onClick={(e) => toggleDropdown(e, 'Help')}
+                            className={`flex items-center gap-1.5 cursor-pointer hover:text-elm-dark transition-colors ${activeDropdown === 'Help' ? 'text-elm-dark' : ''}`}
+                        >
+                            <Icon name="help" size={18} />
+                            <span>Help</span>
+                        </button>
+                        {activeDropdown === 'Help' && (
+                            <div className="absolute top-full right-0 mt-2 w-56 bg-[#ebebeb] rounded-lg shadow-xl border border-gray-200 py-1 overflow-hidden z-30 origin-top-right">
+                                <DropdownItem icon={<Icon name="open_in_new" size={18} />} label="Help Center" />
+                                <DropdownItem icon={<Icon name="mail" size={18} />} label="Contact Us" />
+                                <DropdownItem icon={<Icon name="description" size={18} />} label="FAQs" />
+                            </div>
+                        )}
+                        </div>
+
+                        <div className="relative hidden sm:block">
+                        <button 
+                            onClick={(e) => toggleDropdown(e, 'profile')}
+                            className={`p-1 rounded-full text-gray-600 hover:bg-gray-100 transition-colors ${activeDropdown === 'profile' ? 'bg-gray-100 text-elm-dark' : ''}`}
+                            aria-label="User profile"
+                        >
+                            <Icon name="account_circle" size={28} className="font-light border border-current rounded-full p-0.5" />
+                        </button>
+                        {activeDropdown === 'profile' && (
+                            <div className="absolute top-full right-0 mt-2 w-64 bg-[#ebebeb] rounded-lg shadow-xl border border-gray-200 py-2 overflow-hidden z-30 origin-top-right">
+                                <div className="px-2 py-1 space-y-1">
+                                    <button onClick={() => { setActiveSettingsTab('general'); setIsSettingsModalOpen(true); setActiveDropdown(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-200/80 transition-colors text-left">
+                                        <span className="text-gray-500"><Icon name="settings" size={18} /></span>
+                                        <span>Settings</span>
+                                    </button>
+                                    <DropdownItem icon={<Icon name="chat" size={18} />} label="Send feedback" />
+                                    <DropdownItem icon={<Icon name="shield" size={18} />} label="Admin" />
+                                </div>
+                            </div>
+                        )}
+                        </div>
+                    </div>
+                    </header>
+
+                    <div className="flex-1 overflow-y-auto bg-white p-6 md:p-10">
+                    <div className="max-w-5xl mx-auto space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 text-center sm:text-left">
+                        <div className="space-y-2">
+                            <button 
+                            onClick={() => onNavigate && onNavigate('chat')} 
+                            className="flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors w-fit mx-auto sm:mx-0"
+                            >
+                            <Icon name="chevron_left" size={14} /> Back to current chat
+                            </button>
+                            <h1 className="text-3xl font-bold text-gray-900">Prompts</h1>
+                            <p className="text-sm text-gray-500">Explore and use pre-made prompts or create your own.</p>
+                        </div>
+                        <button 
+                            onClick={() => openPromptModal()}
+                            className={cx(UI_STYLES.button.primaryCompact, "self-center sm:self-start")}
+                        >
+                            <Icon name="add" size={18} /> New prompt
+                        </button>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                        {promptTabs.map((tab) => (
+                            <button
+                            key={tab.id}
+                            onClick={() => setPromptFilter(tab.id)}
+                            className={cx(
+                                UI_STYLES.button.chip,
+                                promptFilter === tab.id ? 'bg-elm-dark text-white border-elm-dark' : 'bg-white'
+                            )}
+                            aria-pressed={promptFilter === tab.id}
+                            >
+                            {tab.label}
+                            </button>
+                        ))}
+                        </div>
+
+                        {filteredPrompts.length === 0 ? (
+                        <div className="border border-dashed border-gray-300 rounded-xl p-10 text-center text-gray-500 bg-gray-50">
+                            <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 mx-auto flex items-center justify-center mb-3">
+                            <Icon name="bolt" size={20} />
+                            </div>
+                            <p className="font-semibold text-gray-700">Start by creating your own prompt.</p>
+                            <p className="text-sm">Prompts you create will appear here.</p>
+                        </div>
+                        ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {filteredPrompts.map((prompt) => {
+                                const isExpanded = !!expandedPrompts[prompt.id];
+                                const shouldClamp = prompt.text.length > 160;
+
+                                return (
+                                <div key={prompt.id} className={UI_STYLES.prompt.card}>
+                                    <div className="flex items-center justify-between gap-2">
+                                    <span 
+                                        className={cx(
+                                            UI_STYLES.prompt.badge,
+                                            prompt.source === 'elm'
+                                            ? 'bg-green-50 text-elm-dark border-green-200'
+                                            : 'bg-gray-100 text-gray-600 border-gray-200'
+                                        )}
+                                    >
+                                        <Icon name={prompt.source === 'elm' ? 'bolt' : 'person'} size={14} />
+                                        {prompt.source === 'elm' ? 'ELM' : 'My prompt'}
+                                    </span>
+                                    </div>
+                                    <div className="space-y-2">
+                                    <h3 className="text-base font-bold text-gray-900">{prompt.title}</h3>
+                                    <p className={cx(UI_STYLES.prompt.text, !isExpanded && shouldClamp && 'prompt-clamp')}>
+                                        {prompt.text}
+                                    </p>
+                                    {shouldClamp && (
+                                        <button
+                                        onClick={() => togglePromptExpanded(prompt.id)}
+                                        className="text-xs font-semibold text-elm-dark hover:underline w-fit"
+                                        aria-expanded={isExpanded}
+                                        >
+                                        {isExpanded ? 'Read less' : 'Read more'}
+                                        </button>
+                                    )}
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2 pt-2">
+                                    <button
+                                        onClick={() => openPromptModal(prompt)}
+                                        className={cx(UI_STYLES.prompt.action, 'text-gray-700 bg-white border-gray-200 hover:border-elm-dark hover:text-elm-dark')}
+                                    >
+                                        <Icon name="content_copy" size={16} /> Copy into new prompt
+                                    </button>
+                                    <button
+                                        onClick={() => usePrompt(prompt)}
+                                        className={cx(UI_STYLES.prompt.action, 'text-white bg-elm-dark border-elm-dark hover:bg-green-900')}
+                                    >
+                                        <Icon name="chat" size={16} /> Use prompt
+                                    </button>
+                                    </div>
+                                </div>
+                                );
+                            })}
+                        </div>
+                        )}
+                    </div>
+                    {renderMobileSheet()}
+                    </div>
+
+                    {isPromptModalOpen && (
+                        <div 
+                        className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                        role="dialog"
+                        aria-modal="true"
+                        >
+                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl flex flex-col overflow-hidden">
+                            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+                            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                <Icon name="add_circle" size={22} className="text-elm-dark" />
+                                <span>New prompt</span>
+                            </h2>
+                            <button onClick={closePromptModal} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500" aria-label="Close">
+                                <Icon name="close" size={20} />
+                            </button>
+                            </div>
+
+                            <div className="p-6 space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-gray-700 ml-1">Prompt title</label>
+                                <input
+                                type="text"
+                                value={promptDraft.title}
+                                onChange={(e) => setPromptDraft(prev => ({ ...prev, title: e.target.value }))}
+                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-elm-dark/20 focus:border-elm-dark outline-none text-sm"
+                                placeholder="Give your prompt a clear title"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-gray-700 ml-1">Prompt text</label>
+                                <textarea
+                                value={promptDraft.text}
+                                onChange={(e) => setPromptDraft(prev => ({ ...prev, text: e.target.value }))}
+                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-elm-dark/20 focus:border-elm-dark outline-none text-sm h-32 resize-none"
+                                placeholder="Write the prompt you want to reuse"
+                                />
+                            </div>
+                            </div>
+
+                            <div className="p-5 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-3">
+                            <button 
+                                onClick={closePromptModal}
+                                className="px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:border-gray-400 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={savePrompt}
+                                className={cx(UI_STYLES.button.primaryCompact, "px-5")}
+                            >
+                                Save prompt
+                            </button>
+                            </div>
+                        </div>
+                        </div>
+                    )}
+                </main>
+                );
+            }
+
+            if (currentView === 'history') {
+                const sortedHistory = [...chatHistory].sort((a, b) => Number(b.pinned) - Number(a.pinned));
+
+                return (
+                <main className={UI_STYLES.surface.panel}>
+                    <header className="flex items-center px-6 py-4 border-b border-transparent">
+                    <div className="flex items-center gap-3">
+                        <button 
+                        onClick={(e) => { e.stopPropagation(); toggleSidebar(); }}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-400 text-sm font-semibold text-elm-dark hover:bg-gray-50 transition-colors"
+                        >
+                        {isSidebarOpen ? <Icon name="close" size={20} /> : <Icon name="menu" size={20} />}
+                        <span>{isSidebarOpen ? "Close" : "Tools"}</span>
+                        </button>
+                    </div>
+                    <div className="flex items-center gap-2 sm:gap-4 text-sm text-gray-600 font-medium ml-auto">
+                        <button 
+                        onClick={toggleEphemeralChat}
+                        className={`p-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors ${isEphemeralChat ? 'bg-gray-200 text-elm-dark border-elm-dark/40' : 'text-gray-600'}`}
+                        aria-label="Do not save this chat"
+                        aria-pressed={isEphemeralChat}
+                        >
+                        <DashedChatIcon size={18} />
+                        </button>
+                        <button 
+                        className={cx(UI_STYLES.button.icon, 'sm:hidden')} 
+                        aria-label="Responsible AI"
+                        onClick={() => setMobileSheet('responsible-ai')}
+                        >
+                        <Icon name="info" size={18} />
+                        </button>
+                        <button 
+                        className={cx(UI_STYLES.button.icon, 'sm:hidden')} 
+                        aria-label="Help"
+                        onClick={() => setMobileSheet('support')}
+                        >
+                        <Icon name="help" size={18} />
+                        </button>
+
+                        <div className="relative hidden sm:block">
+                        <button 
+                            onClick={(e) => toggleDropdown(e, 'responsible-ai')}
+                            className={`flex items-center gap-1.5 cursor-pointer hover:text-elm-dark transition-colors ${activeDropdown === 'responsible-ai' ? 'text-elm-dark' : ''}`}
+                        >
+                            <Icon name="info" size={18} />
+                            <span>Responsible AI</span>
+                        </button>
+                        {activeDropdown === 'responsible-ai' && (
+                            <div className="absolute top-full right-0 mt-2 w-56 bg-[#ebebeb] rounded-lg shadow-xl border border-gray-200 py-1 overflow-hidden z-30 origin-top-right">
+                                <DropdownItem icon={<Icon name="menu_book" size={18} />} label="AI Principles" />
+                                <DropdownItem icon={<Icon name="lock" size={18} />} label="Safety Guidelines" />
+                                <DropdownItem icon={<Icon name="description" size={18} />} label="Privacy Policy" />
+                            </div>
+                        )}
+                        </div>
+
+                        <div className="relative hidden sm:block">
+                        <button 
+                            onClick={(e) => toggleDropdown(e, 'Help')}
+                            className={`flex items-center gap-1.5 cursor-pointer hover:text-elm-dark transition-colors ${activeDropdown === 'Help' ? 'text-elm-dark' : ''}`}
+                        >
+                            <Icon name="help" size={18} />
+                            <span>Help</span>
+                        </button>
+                        {activeDropdown === 'Help' && (
+                            <div className="absolute top-full right-0 mt-2 w-56 bg-[#ebebeb] rounded-lg shadow-xl border border-gray-200 py-1 overflow-hidden z-30 origin-top-right">
+                                <DropdownItem icon={<Icon name="open_in_new" size={18} />} label="Help Center" />
+                                <DropdownItem icon={<Icon name="mail" size={18} />} label="Contact Us" />
+                                <DropdownItem icon={<Icon name="description" size={18} />} label="FAQs" />
+                            </div>
+                        )}
+                        </div>
+
+                        <div className="relative hidden sm:block">
+                        <button 
+                            onClick={(e) => toggleDropdown(e, 'profile')}
+                            className={`p-1 rounded-full text-gray-600 hover:bg-gray-100 transition-colors ${activeDropdown === 'profile' ? 'bg-gray-100 text-elm-dark' : ''}`}
+                            aria-label="User profile"
+                        >
+                            <Icon name="account_circle" size={28} className="font-light border border-current rounded-full p-0.5" />
+                        </button>
+                        {activeDropdown === 'profile' && (
+                            <div className="absolute top-full right-0 mt-2 w-64 bg-[#ebebeb] rounded-lg shadow-xl border border-gray-200 py-2 overflow-hidden z-30 origin-top-right">
+                                <div className="px-2 py-1 space-y-1">
+                                    <button onClick={() => { setActiveSettingsTab('general'); setIsSettingsModalOpen(true); setActiveDropdown(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-200/80 transition-colors text-left">
+                                        <span className="text-gray-500"><Icon name="settings" size={18} /></span>
+                                        <span>Settings</span>
+                                    </button>
+                                    <DropdownItem icon={<Icon name="chat" size={18} />} label="Send feedback" />
+                                    <DropdownItem icon={<Icon name="shield" size={18} />} label="Admin" />
+                                </div>
+                            </div>
+                        )}
+                        </div>
+                    </div>
+                    </header>
+
+                    <div className="flex-1 overflow-y-auto bg-white p-6 md:p-10">
+                    <div className="max-w-5xl mx-auto space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 text-center sm:text-left">
+                        <div className="space-y-2">
+                            <button 
+                            onClick={() => onNavigate && onNavigate('chat')} 
+                            className="flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors w-fit mx-auto sm:mx-0"
+                            >
+                            <Icon name="chevron_left" size={14} /> Back to current chat
+                            </button>
+                            <h1 className="text-3xl font-bold text-gray-900">Chat history</h1>
+                            <p className="text-sm text-gray-500">Review previous conversations, reopen them, or export a copy.</p>
+                        </div>
+                        <button 
+                            onClick={() => onNavigate && onNavigate('chat')}
+                            className={cx(UI_STYLES.button.primaryCompact, "self-center sm:self-start")}
+                        >
+                            <Icon name="chat" size={18} /> New chat
+                        </button>
+                        </div>
+
+                        <div className="space-y-3">
+                        {sortedHistory.map((history) => (
+                            <div 
+                            key={history.id}
+                            className="group w-full border border-gray-200 rounded-xl bg-white hover:border-elm-dark hover:shadow-md transition-all p-5"
+                            >
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 text-center sm:text-left">
+                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-start gap-3 items-center">
+                                <div className="space-y-1">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                                    <span 
+                                        className={`inline-flex items-center justify-center w-7 h-7 rounded-full border mr-0 sm:mr-1 ${history.pinned ? 'border-green-200 bg-green-50 text-elm-dark' : 'border-gray-200 bg-gray-100 text-gray-400'}`}
+                                        aria-label={history.pinned ? 'Pinned chat' : 'Not pinned'}
+                                    >
+                                        {history.pinned ? <Icon name="push_pin" size={18} /> : <Icon name="push_pin" size={18} className="text-gray-400" />}
+                                    </span>
+                                    {editingHistoryId === history.id ? (
+                                        <input 
+                                        value={editingTitle}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) => setEditingTitle(e.target.value)}
+                                        onBlur={saveEditingHistory}
+                                        className="w-full sm:w-auto border border-gray-300 rounded-lg px-3 py-2 text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-elm-dark/30"
+                                        autoFocus
+                                        />
+                                    ) : (
+                                        <button 
+                                        className="w-full text-center sm:text-left"
+                                        onClick={(e) => { e.stopPropagation(); startEditingHistory(history); }}
+                                        >
+                                        <h3 className="text-lg font-bold text-gray-900 group-hover:text-elm-dark break-words w-full">{history.title}</h3>
+                                        </button>
+                                    )}
+                                    </div>
+                                    <p className="text-sm text-gray-600 max-w-2xl break-words leading-relaxed w-full sm:text-left text-center sm:pl-0 pl-0 sm:pr-0">{history.snippet}</p>
+                                    {editingHistoryId === history.id && (
+                                        <div className="flex flex-wrap justify-center sm:justify-start gap-2 pt-2">
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); saveEditingHistory(); }}
+                                            className="px-3 py-1.5 text-xs font-semibold text-white bg-elm-dark rounded-lg hover:bg-green-900 transition-colors"
+                                        >
+                                            Save
+                                        </button>
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); cancelEditingHistory(); }}
+                                            className="px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:border-gray-400 transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        </div>
+                                    )}
+                                </div>
+                                </div>
+                                <div className="text-center sm:text-right text-sm text-gray-500 w-full sm:w-auto">
+                                <p className="font-semibold text-gray-700">{history.updated}</p>
+                                <p className="text-xs text-gray-400">{history.messages.length} messages · {history.length}</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start sm:items-center justify-end mt-4 flex-wrap gap-2 sm:gap-3 text-center sm:text-left">
+                                <div className="flex flex-wrap gap-2 sm:gap-2 w-full sm:w-auto">
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); downloadHistory(history); }}
+                                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:border-elm-dark hover:text-elm-dark transition-colors w-full sm:w-auto"
+                                    title="Download history"
+                                >
+                                    <Icon name="download" size={18} />
+                                    Download
+                                </button>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); deleteHistory(history.id); }}
+                                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-white border border-gray-200 rounded-lg hover:border-red-400 transition-colors w-full sm:w-auto"
+                                    title="Delete history"
+                                >
+                                    <Icon name="delete" size={18} />
+                                    Delete
+                                </button>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); openHistory(history); }}
+                                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-elm-dark rounded-lg hover:bg-green-900 transition-colors w-full sm:w-auto"
+                                    title="Open chat"
+                                >
+                                    <Icon name="open_in_new" size={18} />
+                                    Open
+                                </button>
+                                </div>
+                            </div>
+                            </div>
+                        ))}
+
+                        {sortedHistory.length === 0 && (
+                            <div className="border border-dashed border-gray-300 rounded-lg p-10 text-center text-gray-500 bg-gray-50">
+                            <p className="font-semibold text-gray-700">No chat history yet.</p>
+                            <p className="text-sm">Start a conversation and it will appear here.</p>
+                            </div>
+                        )}
+                        </div>
+                    </div>
+                    {renderMobileSheet()}
+                    </div>
+                </main>
+                );
+            }
+
+            // ===============================================================
+            // MODEL GUIDE PAGE
+            // Full-page view showing all models with details, provider badges,
+            // sustainability tags, and a "Use this model" action.
+            // Mirrors the layout of the Prompts page.
+            // ===============================================================
+            if (currentView === 'model-guide') {
+                // Filter tabs for the Model Guide
+                const guideTabs = [
+                    { id: 'all', label: 'All models' },
+                    { id: 'local', label: 'Local' },
+                    { id: 'openai', label: 'OpenAI' },
+                    { id: 'gemini', label: 'Gemini' }
+                ];
+
+                // Enrich each model with its provider info and thinking capability
+                const enrichedModels = uniqueModels.map(model => ({
+                    ...model,
+                    provider: MODEL_GROUPS.find(g => g.models.includes(model.name))?.label || 'Unknown',
+                    providerId: MODEL_GROUPS.find(g => g.models.includes(model.name))?.id || 'unknown',
+                    isThinking: THINKING_MODELS.includes(model.name)
+                }));
+
+                // Apply the provider filter
+                const filteredGuideModels = enrichedModels.filter(model => {
+                    if (modelGuideFilter === 'all') return true;
+                    return model.providerId === modelGuideFilter;
+                });
+
+                return (
+                <main className={UI_STYLES.surface.panel}>
+                    {/* Page header -- matches the Prompts page header pattern */}
+                    <header className="flex items-center px-6 py-4 border-b border-transparent">
+                    <div className="flex items-center gap-3">
+                        <button
+                        onClick={(e) => { e.stopPropagation(); toggleSidebar(); }}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-400 text-sm font-semibold text-elm-dark hover:bg-gray-50 transition-colors"
+                        aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+                        >
+                        {isSidebarOpen ? <Icon name="close" size={20} /> : <Icon name="menu" size={20} />}
+                        <span>{isSidebarOpen ? "Close" : "Tools"}</span>
+                        </button>
+                    </div>
+                    <div className="flex items-center gap-2 sm:gap-4 text-sm text-gray-600 font-medium ml-auto">
+                        <button className={cx(UI_STYLES.button.icon, 'sm:hidden')} aria-label="Responsible AI" onClick={() => setMobileSheet('responsible-ai')}>
+                            <Icon name="info" size={18} />
+                        </button>
+                        <button className={cx(UI_STYLES.button.icon, 'sm:hidden')} aria-label="Help" onClick={() => setMobileSheet('support')}>
+                            <Icon name="help" size={18} />
+                        </button>
+                        <button className={cx(UI_STYLES.button.icon, 'sm:hidden')} aria-label="Account" onClick={() => setMobileSheet('account')}>
+                            <Icon name="account_circle" size={18} />
+                        </button>
+
+                        <div className="relative hidden sm:block">
+                        <button onClick={(e) => toggleDropdown(e, 'responsible-ai')}
+                            className={`flex items-center gap-1.5 cursor-pointer hover:text-elm-dark transition-colors ${activeDropdown === 'responsible-ai' ? 'text-elm-dark' : ''}`}>
+                            <Icon name="info" size={18} /><span>Responsible AI</span>
+                        </button>
+                        {activeDropdown === 'responsible-ai' && (
+                            <div className="absolute top-full right-0 mt-2 w-56 bg-[#ebebeb] rounded-lg shadow-xl border border-gray-200 py-1 overflow-hidden z-30 origin-top-right">
+                                <DropdownItem icon={<Icon name="menu_book" size={18} />} label="AI Principles" />
+                                <DropdownItem icon={<Icon name="lock" size={18} />} label="Safety Guidelines" />
+                                <DropdownItem icon={<Icon name="description" size={18} />} label="Privacy Policy" />
+                            </div>
+                        )}
+                        </div>
+
+                        <div className="relative hidden sm:block">
+                        <button onClick={(e) => toggleDropdown(e, 'Help')}
+                            className={`flex items-center gap-1.5 cursor-pointer hover:text-elm-dark transition-colors ${activeDropdown === 'Help' ? 'text-elm-dark' : ''}`}>
+                            <Icon name="help" size={18} /><span>Help</span>
+                        </button>
+                        {activeDropdown === 'Help' && (
+                            <div className="absolute top-full right-0 mt-2 w-56 bg-[#ebebeb] rounded-lg shadow-xl border border-gray-200 py-1 overflow-hidden z-30 origin-top-right">
+                                <DropdownItem icon={<Icon name="open_in_new" size={18} />} label="Help Center" />
+                                <DropdownItem icon={<Icon name="mail" size={18} />} label="Contact Us" />
+                                <DropdownItem icon={<Icon name="description" size={18} />} label="FAQs" />
+                            </div>
+                        )}
+                        </div>
+
+                        <div className="relative hidden sm:block">
+                        <button onClick={(e) => toggleDropdown(e, 'profile')}
+                            className={`p-1 rounded-full text-gray-600 hover:bg-gray-100 transition-colors ${activeDropdown === 'profile' ? 'bg-gray-100 text-elm-dark' : ''}`}
+                            aria-label="User profile">
+                            <Icon name="account_circle" size={28} className="font-light border border-current rounded-full p-0.5" />
+                        </button>
+                        {activeDropdown === 'profile' && (
+                            <div className="absolute top-full right-0 mt-2 w-64 bg-[#ebebeb] rounded-lg shadow-xl border border-gray-200 py-2 overflow-hidden z-30 origin-top-right">
+                                <div className="px-2 py-1 space-y-1">
+                                    <button onClick={() => { setActiveSettingsTab('general'); setIsSettingsModalOpen(true); setActiveDropdown(null); }}
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-200/80 transition-colors text-left">
+                                        <Icon name="settings" size={18} /><span>Settings</span>
+                                    </button>
+                                    <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-200/80 transition-colors text-left">
+                                        <Icon name="logout" size={18} /><span>Sign out</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                        </div>
+                    </div>
+                    </header>
+
+                    {/* Page body -- scrollable content area */}
+                    <div className="flex-1 overflow-y-auto bg-white p-6 md:p-10" onClick={closeDropdowns}>
+                    <div className="max-w-5xl mx-auto space-y-6">
+                        {/* Breadcrumb and title */}
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 text-center sm:text-left">
+                            <div className="space-y-2">
+                                <button
+                                    onClick={() => onNavigate && onNavigate('chat')}
+                                    className="flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors w-fit mx-auto sm:mx-0"
+                                >
+                                    <Icon name="chevron_left" size={14} /> Back to current chat
+                                </button>
+                                <h1 className="text-3xl font-bold text-gray-900">Model Guide</h1>
+                                <p className="text-sm text-gray-500">
+                                    Explore available AI models, compare their strengths, and select the right one for your task.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Provider filter chips */}
+                        <div className="flex flex-wrap gap-2">
+                            {guideTabs.map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setModelGuideFilter(tab.id)}
+                                    className={cx(
+                                        UI_STYLES.button.chip,
+                                        modelGuideFilter === tab.id ? 'bg-elm-dark text-white border-elm-dark' : 'bg-white'
+                                    )}
+                                    aria-pressed={modelGuideFilter === tab.id}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Empty state for Gemini (no models yet) */}
+                        {filteredGuideModels.length === 0 ? (
+                            <div className="border border-dashed border-gray-300 rounded-xl p-10 text-center text-gray-500 bg-gray-50">
+                                <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 mx-auto flex items-center justify-center mb-3">
+                                    <Icon name="auto_awesome" size={20} />
+                                </div>
+                                <p className="font-semibold text-gray-700">No models available yet.</p>
+                                <p className="text-sm">Models in this category will appear here when they become available.</p>
+                            </div>
+                        ) : (
+                            /* Model cards grid -- 2 columns on desktop, 1 on mobile */
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {filteredGuideModels.map((model, idx) => (
+                                    <div key={idx} className={UI_STYLES.modelGuide.card}>
+                                        {/* Top row: sustainability tag + provider badge */}
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className={cx(
+                                                UI_STYLES.prompt.badge,
+                                                model.type === 'green' ? UI_STYLES.modelGuide.tagGreen
+                                                    : model.type === 'fast' ? UI_STYLES.modelGuide.tagFast
+                                                    : UI_STYLES.modelGuide.tagHeavy
+                                            )}>
+                                                <Icon name={model.type === 'green' ? 'eco' : model.type === 'fast' ? 'bolt' : 'local_fire_department'} size={12} />
+                                                {model.tag}
+                                            </span>
+                                            <span className="text-[10px] font-medium text-elm-dark bg-green-50 px-1.5 py-0.5 rounded">
+                                                {model.provider}
+                                            </span>
+                                        </div>
+
+                                        {/* Model name and description */}
+                                        <h3 className="text-base font-bold text-gray-900">{model.name}</h3>
+                                        <p className={UI_STYLES.prompt.text}>{model.description}</p>
+                                        <p className="text-[10px] font-medium text-gray-500">{model.category}</p>
+
+                                        {/* Reasoning amount selector -- only shown for thinking models */}
+                                        {model.isThinking && (
+                                            <div className="space-y-1.5 pt-1">
+                                                <label className="text-xs font-bold text-gray-600">Reasoning amount</label>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {REASONING_LEVELS.map(level => (
+                                                        <button
+                                                            key={level.id}
+                                                            onClick={() => setSelectedReasoningAmount(level.id)}
+                                                            className={cx(
+                                                                'px-2.5 py-1 text-xs font-medium rounded-md border transition-colors',
+                                                                selectedReasoningAmount === level.id
+                                                                    ? 'bg-elm-dark text-white border-elm-dark'
+                                                                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                                                            )}
+                                                            aria-pressed={selectedReasoningAmount === level.id}
+                                                        >
+                                                            {level.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Action: select this model and go back to the chat */}
+                                        <div className="pt-2">
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedModelName(model.name);
+                                                    setDisplayModelText(`Model: ${model.name}`);
+                                                    onNavigate && onNavigate('chat');
+                                                }}
+                                                className={cx(UI_STYLES.prompt.action, 'text-white bg-elm-dark border-elm-dark hover:bg-green-900')}
+                                            >
+                                                <Icon name="check_circle" size={16} /> Use this model
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    </div>
+                    {renderMobileSheet()}
+                </main>
+                );
+            }
+
+            if (currentView === 'folders') {
+                return (
+                <main className={UI_STYLES.surface.panel}>
+                    <header className="flex items-center justify-between px-6 py-4 border-b border-transparent">
+                    <div className="flex items-center gap-3">
+                        <button 
+                        onClick={(e) => { e.stopPropagation(); toggleSidebar(); }}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-400 text-sm font-semibold text-elm-dark hover:bg-gray-50 transition-colors"
+                        >
+                        {isSidebarOpen ? <Icon name="close" size={20} /> : <Icon name="menu" size={20} />}
+                        <span>{isSidebarOpen ? "Close" : "Tools"}</span>
+                        </button>
+                        <div className="flex items-center gap-2 sm:hidden ml-1">
+                        <button 
+                            className={cx(UI_STYLES.button.icon, 'sm:hidden')} 
+                            aria-label="Responsible AI"
+                            onClick={() => setMobileSheet('responsible-ai')}
+                        >
+                            <Icon name="info" size={18} />
+                        </button>
+                        <button 
+                            className={cx(UI_STYLES.button.icon, 'sm:hidden')} 
+                            aria-label="Help"
+                            onClick={() => setMobileSheet('support')}
+                        >
+                            <Icon name="help" size={18} />
+                        </button>
+                        <button 
+                            className={cx(UI_STYLES.button.icon, 'sm:hidden')} 
+                            aria-label="Account"
+                            onClick={() => setMobileSheet('account')}
+                        >
+                            <Icon name="account_circle" size={18} />
+                        </button>
+                        </div>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-4 text-sm text-gray-600 font-medium">
+                        <div className="flex items-center gap-1.5"><Icon name="info" size={18} /><span>Responsible AI</span></div>
+                        <div className="flex items-center gap-1.5"><Icon name="help" size={18} /><span>Help</span></div>
+                        <div className="p-1 rounded-full border border-gray-400"><Icon name="account_circle" size={24} className="text-gray-600" /></div>
+                    </div>
+                    </header>
+
+                    <div className="flex-1 overflow-y-auto bg-white p-6 md:p-10">
+                    {folderView === 'list' && (() => {
+                        const storageUsedMB = 21.89;
+                        const storageTotalMB = 1024;
+                        const storagePercent = Math.min(100, Math.round((storageUsedMB / storageTotalMB) * 100));
+
+                        return (
+                        <div className="max-w-5xl mx-auto space-y-6">
+                            <button
+                                onClick={() => onNavigate && onNavigate('chat')}
+                                className="flex items-center gap-1 text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors w-fit"
+                            >
+                                <Icon name="chevron_left" size={14} /> Return to chat
+                            </button>
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="space-y-2">
+                                    <h1 className="text-3xl font-bold text-gray-900">Folders</h1>
+                                    <p className={UI_STYLES.folder.summaryText}>Manage files and include them in your chats. (You've used 21.89 MB out of 1 GB storage available)</p>
+                                    <p className={UI_STYLES.folder.summaryText}>The documents you can select is limited by the size of the model context:</p>
+                                    <div className={UI_STYLES.folder.limitCard}>
+                                        <p className={UI_STYLES.folder.limitLabel}>Document text limit: {selectedModelName}</p>
+                                        <div className={UI_STYLES.folder.limitBar} aria-hidden="true">
+                                            <div className={UI_STYLES.folder.limitBarFill} style={{ width: `${storagePercent}%` }} />
+                                        </div>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => setFolderView('edit')}
+                                    className={UI_STYLES.folder.addButton}
+                                >
+                                    <span className="sm:hidden">+ Folder</span>
+                                    <span className="hidden sm:inline flex items-center gap-2">
+                                        <Icon name="add" size={18} /> Add folder
+                                    </span>
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                {folders.map((folder) => {
+                                    const isExpanded = folder.id === activeFolderId;
+                                    return (
+                                        <div key={folder.id} className={UI_STYLES.folder.listCard}>
+                                            <div className={UI_STYLES.folder.listRow}>
+                                                <button
+                                                    className={cx(UI_STYLES.folder.listRowButton, "flex items-center justify-between gap-4")}
+                                                    onClick={() => setActiveFolderId(folder.id)}
+                                                >
+                                                    <div className={UI_STYLES.folder.listRowHeader}>
+                                                        <Icon name="folder" size={20} className="text-gray-700" />
+                                                        <span className={UI_STYLES.folder.listRowName}>{folder.name}</span>
+                                                    </div>
+                                                    <div className="flex flex-wrap items-center justify-end gap-4 text-right">
+                                                        <span className={UI_STYLES.folder.listRowStatus}>{folder.selectedLabel}</span>
+                                                        <div className={UI_STYLES.folder.listRowMeta}>
+                                                            <span className={UI_STYLES.folder.listRowMetaItem}>
+                                                                <Icon name="description" size={16} />
+                                                                No. documents :{folder.docCount}
+                                                            </span>
+                                                            <span className={UI_STYLES.folder.listRowMetaItem}>
+                                                                <Icon name="storage" size={16} />
+                                                                Size:{folder.size}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            </div>
+
+                                            {isExpanded && (
+                                                <div className={UI_STYLES.folder.listExpanded}>
+                                                    {folder.files.length > 0 ? (
+                                                        <div className="space-y-2">
+                                                            {folder.files.map((file) => (
+                                                                <div key={file.id} className={UI_STYLES.folder.fileRow}>
+                                                                    <div className={UI_STYLES.folder.fileInfo}>
+                                                                        <Icon name="check_box" size={18} className="text-elm-dark" />
+                                                                        <Icon name="description" size={18} className="text-gray-500" />
+                                                                        <div>
+                                                                            <div className={UI_STYLES.folder.fileName}>{file.name}</div>
+                                                                            <div className={UI_STYLES.folder.fileSize}>{file.size}</div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-xs text-gray-500">No documents in this folder yet.</p>
+                                                    )}
+                                                    <div className={UI_STYLES.folder.actionRow}>
+                                                        <button
+                                                            className={cx(UI_STYLES.folder.actionLink, UI_STYLES.folder.actionEdit)}
+                                                            onClick={() => setFolderView('edit')}
+                                                        >
+                                                            <Icon name="edit" size={18} />
+                                                            Edit Folder
+                                                        </button>
+                                                        <button className={cx(UI_STYLES.folder.actionLink, UI_STYLES.folder.actionDelete)}>
+                                                            <Icon name="delete" size={18} />
+                                                            Delete Folder
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        );
+                    })()}
+
+                    {folderView === 'edit' && (() => {
+                        const storageUsedMB = 21.89;
+                        const storageTotalMB = 1024;
+                        const storagePercent = Math.min(100, Math.round((storageUsedMB / storageTotalMB) * 100));
+                        const activeFolder = folders.find(folder => folder.id === activeFolderId) || folders[1] || folders[0];
+
+                        return (
+                        <div className="max-w-3xl mx-auto space-y-6">
+                            <button
+                                onClick={() => setFolderView('list')}
+                                className="flex items-center gap-1 text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors w-fit"
+                            >
+                                <Icon name="chevron_left" size={14} /> Return to my folders
+                            </button>
+                            <div className="space-y-2">
+                                <h1 className="text-2xl font-bold text-gray-900">Folders</h1>
+                                <p className={UI_STYLES.folder.summaryText}>Manage files and include them in your chats. (You've used 21.89 MB out of 1 GB storage available)</p>
+                                <p className={UI_STYLES.folder.summaryText}>The documents you can select is limited by the size of the model context:</p>
+                                <div className={UI_STYLES.folder.limitCard}>
+                                    <p className={UI_STYLES.folder.limitLabel}>Document text limit: {selectedModelName}</p>
+                                    <div className={UI_STYLES.folder.limitBar} aria-hidden="true">
+                                        <div className={UI_STYLES.folder.limitBarFill} style={{ width: `${storagePercent}%` }} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-gray-700 ml-1">Folder Name*</label>
+                                    <input
+                                        type="text"
+                                        defaultValue={activeFolder?.name || "drafts"}
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-elm-dark/20 focus:border-elm-dark text-gray-900"
+                                    />
+                                </div>
+
+                                <div className={UI_STYLES.folder.uploadBox}>
+                                    <h3 className={UI_STYLES.folder.uploadTitle}>Add content to this folder to use in a chat</h3>
+                                    <p className={UI_STYLES.folder.uploadHint}>Drag and Drop to upload</p>
+                                    <p className={UI_STYLES.folder.uploadMeta}>TXT(UTF-8), CSV(UTF-8), PDF, DOCX (max size per document 100MB),</p>
+                                    <button className={UI_STYLES.folder.uploadButton}>
+                                        <Icon name="upload_file" size={18} /> Upload
+                                    </button>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <p className="text-sm font-semibold text-gray-800">Existing documents:</p>
+                                    {activeFolder?.files?.length ? (
+                                        activeFolder.files.map((file) => (
+                                            <div key={file.id} className={UI_STYLES.folder.existingDocs}>
+                                                <div className="flex items-center gap-3">
+                                                    <Icon name="description" size={18} className="text-gray-600" />
+                                                    <div>
+                                                        <div className="text-sm font-medium text-gray-900">{file.name}</div>
+                                                        <div className="text-xs text-gray-500">{file.size}</div>
+                                                    </div>
+                                                </div>
+                                                <button className="p-1 text-gray-500 hover:text-gray-700" aria-label="Remove document">
+                                                    <Icon name="close" size={18} />
+                                                </button>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="text-xs text-gray-500">No documents uploaded yet.</div>
+                                    )}
+                                </div>
+
+                                <div className={UI_STYLES.folder.infoCallout}>
+                                    <Icon name="info" size={18} />
+                                    <p>
+                                        ELM operates under a Zero Data Retention policy with OpenAI which means data are kept secure and are limited to University only use. If you have a business need to process personal or private data please contact us at <a href="mailto:edina@ed.ac.uk" className="underline">edina@ed.ac.uk</a> to discuss as you may require formal approval from the University Data Protection Officer. <strong>ELM must not be used with identifiable patient or identifiable clinical data.</strong>
+                                    </p>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold text-gray-700 ml-1">Description</label>
+                                    <textarea
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-elm-dark/20 focus:border-elm-dark outline-none text-sm h-24 resize-none"
+                                        placeholder=""
+                                    />
+                                </div>
+
+                                <div className="flex items-center justify-end gap-3 pt-2">
+                                    <button
+                                        onClick={() => setFolderView('list')}
+                                        className="px-6 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-elm-dark hover:bg-gray-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        className="px-6 py-2 bg-gray-200 text-gray-400 rounded-lg text-sm font-semibold cursor-not-allowed"
+                                        disabled
+                                    >
+                                        Upload
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        );
+                    })()}
+                    </div>
+                    {renderMobileSheet()}
+                </main>
+                );
+            }
+
+            return (
+                <main 
+                className={UI_STYLES.surface.panel}
+                onClick={closeDropdowns}
+                >
+                <header className="flex items-center justify-between px-6 py-4 border-b border-transparent z-20 bg-white/90 backdrop-blur-sm">
+                    <div className="flex items-center gap-3">
+                    <button 
+                        onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSidebar();
+                        }}
+                        className={`
+                        flex items-center gap-2 px-3 py-1.5 rounded-md border border-gray-400 
+                        text-sm font-semibold text-elm-dark hover:bg-gray-50 transition-colors
+                        `}
+                        aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+                    >
+                        {isSidebarOpen ? <Icon name="close" size={20} /> : <Icon name="menu" size={20} />}
+                        <span>{isSidebarOpen ? "Close" : "Tools"}</span>
+                    </button>
+                    
+                    <button 
+                        className="p-2 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100 transition-colors"
+                        aria-label="New chat"
+                        onClick={() => { setMessages([]); setHasChatStarted(false); setInputVal(""); }}
+                    >
+                        <Icon name="edit_square" size={20} />
+                    </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 sm:gap-4 md:gap-6 text-sm text-gray-600 font-medium ml-auto">
+                        <button 
+                        onClick={toggleEphemeralChat}
+                        className={`p-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors ${isEphemeralChat ? 'bg-gray-200 text-elm-dark border-elm-dark/40' : 'text-gray-600'}`}
+                        aria-label="Do not save this chat"
+                        aria-pressed={isEphemeralChat}
+                        >
+                        <DashedChatIcon size={18} />
+                        </button>
+                        <button 
+                        onClick={() => setMobileSheet('responsible-ai')}
+                        className={cx(UI_STYLES.button.icon, 'sm:hidden')}
+                        aria-label="Responsible AI"
+                        >
+                        <Icon name="info" size={18} />
+                        </button>
+                        <button 
+                        onClick={() => setMobileSheet('support')}
+                        className={cx(UI_STYLES.button.icon, 'sm:hidden')}
+                        aria-label="Help"
+                        >
+                        <Icon name="help" size={18} />
+                        </button>
+                        <button 
+                        onClick={() => setMobileSheet('account')}
+                        className={cx(UI_STYLES.button.icon, 'sm:hidden')}
+                        aria-label="Account"
+                        >
+                        <Icon name="account_circle" size={18} />
+                        </button>
+                        <div className="relative hidden sm:block">
+                            <button 
+                            onClick={(e) => toggleDropdown(e, 'responsible-ai')}
+                            className={`flex items-center gap-1.5 cursor-pointer hover:text-elm-dark transition-colors ${activeDropdown === 'responsible-ai' ? 'text-elm-dark' : ''}`}
+                            >
+                                <Icon name="info" size={18} />
+                                <span>Responsible AI</span>
+                            </button>
+                            {activeDropdown === 'responsible-ai' && (
+                            <div className="absolute top-full right-0 mt-2 w-56 bg-[#ebebeb] rounded-lg shadow-xl border border-gray-200 py-1 overflow-hidden z-30 origin-top-right">
+                                <DropdownItem icon={<Icon name="menu_book" size={18} />} label="AI Principles" />
+                                <DropdownItem icon={<Icon name="lock" size={18} />} label="Safety Guidelines" />
+                                <DropdownItem icon={<Icon name="description" size={18} />} label="Privacy Policy" />
+                            </div>
+                            )}
+                        </div>
+
+                        <div className="relative hidden sm:block">
+                            <button 
+                            onClick={(e) => toggleDropdown(e, 'Help')}
+                            className={`flex items-center gap-1.5 cursor-pointer hover:text-elm-dark transition-colors ${activeDropdown === 'Help' ? 'text-elm-dark' : ''}`}
+                            >
+                                <Icon name="help" size={18} />
+                                <span>Help</span>
+                            </button>
+                            {activeDropdown === 'Help' && (
+                            <div className="absolute top-full right-0 mt-2 w-56 bg-[#ebebeb] rounded-lg shadow-xl border border-gray-200 py-1 overflow-hidden z-30 origin-top-right">
+                                <DropdownItem icon={<Icon name="open_in_new" size={18} />} label="Help Center" />
+                                <DropdownItem icon={<Icon name="mail" size={18} />} label="Contact Us" />
+                                <DropdownItem icon={<Icon name="description" size={18} />} label="FAQs" />
+                            </div>
+                            )}
+                        </div>
+
+                        <div className="relative hidden sm:block">
+                            <button 
+                            onClick={(e) => toggleDropdown(e, 'profile')}
+                            className={`p-1 rounded-full text-gray-600 hover:bg-gray-100 transition-colors ${activeDropdown === 'profile' ? 'bg-gray-100 text-elm-dark' : ''}`}
+                            aria-label="User profile"
+                            >
+                            <Icon name="account_circle" size={28} className="font-light border border-current rounded-full p-0.5" />
+                            </button>
+                            {activeDropdown === 'profile' && (
+                            <div className="absolute top-full right-0 mt-2 w-64 bg-[#ebebeb] rounded-lg shadow-xl border border-gray-200 py-2 overflow-hidden z-30 origin-top-right">
+                                <div className="px-2 py-1 space-y-1">
+                                    <button onClick={() => { setActiveSettingsTab('general'); setIsSettingsModalOpen(true); setActiveDropdown(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-200/80 transition-colors text-left">
+                                        <span className="text-gray-500"><Icon name="settings" size={18} /></span>
+                                        <span>Settings</span>
+                                    </button>
+                                    <DropdownItem icon={<Icon name="chat" size={18} />} label="Send feedback" />
+                                    <DropdownItem icon={<Icon name="shield" size={18} />} label="Admin" />
+                                </div>
+                            </div>
+                            )}
+                        </div>
+                    </div>
+                </header>
+
+                <div className="flex-1 flex flex-col relative w-full overflow-hidden">
+                    <input
+                        ref={imageInputRef}
+                        type="file"
+                        className="hidden"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        multiple
+                        onChange={(e) => {
+                            handleImageFiles(e.target.files);
+                            e.target.value = "";
+                        }}
+                    />
+                    
+                    {toastMessage && (
+                    <div className="sm:hidden fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
+                        <div className="bg-gray-900 text-white text-xs font-medium px-3 py-2 rounded-full shadow-lg max-w-[80vw] text-center">
+                            {toastMessage}
+                        </div>
+                    </div>
+                    )}
+
+                    {isEphemeralChat && (
+                    <div className="px-3 md:px-4 pt-2">
+                        <div className="max-w-4xl mx-auto text-center text-gray-700 text-xs md:text-sm leading-snug px-2">
+                        This chat will not appear in your list of chats and its content will be inaccessible to you after 60 minutes of inactivity. You will not be able to come back to it later.
+                        </div>
+                    </div>
+                    )}
+
+                    {!hasChatStarted && (
+                <div className="flex-1 flex flex-col items-center justify-start md:justify-center p-4 pt-6 overflow-y-auto">
+                        <div className="w-full max-w-4xl flex flex-col items-center">
+                            <div className="mb-10 text-center">
+                            <h1 className="text-3xl md:text-4xl font-bold text-elm-dark mb-3">
+                                Welcome to ELM
+                            </h1>
+                            <p className="text-lg md:text-xl text-gray-600 font-normal">
+                                How can ELM help today?
+                            </p>
+                            </div>
+
+                            <div className={cx(UI_STYLES.inputShell, 'w-full max-w-2xl mb-8')}>
+                            <div className="p-4 pb-0">
+                                <textarea 
+                                ref={inputRef}
+                                className="w-full bg-transparent border-none resize-none focus:ring-0 text-gray-800 placeholder-gray-500 text-base"
+                                placeholder="Ask anything..."
+                                aria-label="Chat input"
+                                style={{ height: `${inputHeight}px`, minHeight: '64px', maxHeight: '400px' }}
+                                value={inputVal}
+                                onChange={(e) => setInputVal(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    handleImageFiles(e.dataTransfer.files);
+                                }}
+                                />
+                                <div className="flex items-center justify-between mt-2 mb-2">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    <div className="relative">
+                                    <button 
+                                        onClick={(e) => toggleDropdown(e, 'plus-menu')}
+                                        className={`p-2 rounded-lg border border-gray-400 text-gray-600 hover:bg-gray-300 transition-colors ${activeDropdown === 'plus-menu' ? 'bg-gray-300 text-gray-900' : ''}`}
+                                    >
+                                        <Icon name="add" size={20} />
+                                    </button>
+                                    {activeDropdown === 'plus-menu' && (
+                                        <div className="absolute top-full left-0 mt-2 w-56 bg-[#ebebeb] rounded-lg shadow-xl border border-gray-200 py-1 overflow-hidden z-30 origin-top-left">
+                                            <p className="px-4 py-2 text-xs font-semibold text-gray-500">Attach files from:</p>
+                                            <button 
+                                            onClick={handleNavigateToFolders}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-200/80 transition-colors text-left"
+                                            >
+                                            <span className="text-gray-500"><Icon name="folder" size={18} /></span>
+                                            <span>Folders</span>
+                                            </button>
+                                            <button 
+                                            onClick={handleUploadClick}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-200/80 transition-colors text-left"
+                                            >
+                                            <span className="text-gray-500"><Icon name="upload_file" size={18} /></span>
+                                            <span>Upload from this device</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                    </div>
+
+                                    <div className="flex items-center gap-2 text-sm text-gray-700 max-w-full overflow-hidden">
+                                    {/* Model selector -- opens a dropdown popover instead of the settings modal */}
+                                    <div className="relative" ref={modelDropdownRef}>
+                                        <button
+                                            onClick={() => setIsModelDropdownOpen(prev => !prev)}
+                                            className={cx(
+                                                UI_STYLES.button.selectorBase,
+                                                isModelDropdownOpen ? UI_STYLES.button.selectorActive : UI_STYLES.button.selectorInactive
+                                            )}
+                                            aria-expanded={isModelDropdownOpen}
+                                            aria-haspopup="listbox"
+                                        >
+                                            <Icon name="memory" size={18} className="shrink-0" />
+                                            <span className="truncate">{displayModelText}</span>
+                                            <Icon name={isModelDropdownOpen ? "expand_less" : "expand_more"} size={16} className="shrink-0" />
+                                        </button>
+                                        {renderModelDropdown()}
+                                    </div>
+                                    <button
+                                        onClick={() => setIsWebSearchEnabled((prev) => !prev)}
+                                        className={cx(
+                                            UI_STYLES.button.selectorBase,
+                                            isWebSearchEnabled ? UI_STYLES.button.selectorActive : UI_STYLES.button.selectorInactive
+                                        )}
+                                        aria-pressed={isWebSearchEnabled}
+                                        aria-label="Include Web Search"
+                                    >
+                                        <Icon name="public" size={18} className="shrink-0" />
+                                        <span className="hidden sm:inline">Include Web Search</span>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            if (!modelSupportsImages(selectedModelName)) {
+                                                showToast(imageSupportMessage);
+                                                return;
+                                            }
+                                            handleImageUploadClick();
+                                        }}
+                                        className={cx(
+                                            UI_STYLES.button.selectorBase,
+                                            UI_STYLES.button.selectorInactive,
+                                            'px-2',
+                                            !modelSupportsImages(selectedModelName) && 'opacity-40 cursor-not-allowed hover:bg-white/50 hover:shadow-none'
+                                        )}
+                                        aria-label="Image query"
+                                        aria-disabled={!modelSupportsImages(selectedModelName)}
+                                        title={!modelSupportsImages(selectedModelName) ? imageSupportMessage : 'Image query'}
+                                    >
+                                        <Icon name="image_search" size={18} className="shrink-0" />
+                                    </button>
+                                    </div>
+                                </div>
+
+                                <button 
+                                    className={`p-2 rounded-lg transition-colors ${inputVal.trim() ? 'bg-elm-dark text-white hover:bg-green-900' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                                    onClick={handleSendMessage}
+                                    disabled={!inputVal.trim()}
+                                    aria-label="Send message"
+                                >
+                                    <Icon name="arrow_upward" size={20} />
+                                </button>
+                                </div>
+                            </div>
+                            {attachedFiles.length > 0 && (
+                                <div className="bg-[#dadada] px-4 py-2.5 flex items-center gap-3">
+                                <Icon name="attach_file" size={18} className="text-gray-500" />
+                                <span className="text-xs font-medium text-gray-600">
+                                    {attachedFiles.length} files attached
+                                </span>
+                                <button 
+                                    onClick={() => setIsFilesSidebarOpen(true)}
+                                    className="text-xs font-bold text-elm-dark hover:underline flex items-center gap-0.5 ml-auto"
+                                >
+                                    View all <Icon name="chevron_right" size={14} />
+                                </button>
+                                </div>
+                            )}
+                            <div 
+                                className="h-4 w-full cursor-ns-resize hover:bg-gray-200 flex items-center justify-center group rounded-b-2xl"
+                                onMouseDown={handleMouseDown}
+                            >
+                                <div className="w-12 h-1 bg-gray-300 group-hover:bg-gray-400 rounded-full" />
+                            </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-4xl">
+                            <div className="bg-[#fcf8e3] border border-[#faebcc] p-4 rounded-xl text-[#8a6d3b]">
+                                <h4 className="font-bold text-sm mb-1 flex items-center gap-2">
+                                    <Icon name="error" size={18} /> Responsibility
+                                </h4>
+                                <p className="text-xs leading-relaxed">
+                                    Generative AI carries with it ethical and environmental concerns. It is vital to retain a critical perspective when chatting with ELM. Please use ELM responsibly.
+                                </p>
+                            </div>
+                            <div className="bg-[#e8eceb] border border-gray-200 p-4 rounded-xl text-gray-700">
+                                <h4 className="font-bold text-sm mb-1 flex items-center gap-2">
+                                    <Icon name="menu_book" size={18} /> AI Guidance
+                                </h4>
+                                <p className="text-xs leading-relaxed">
+                                    Please refer to our <a href="#" className="underline font-semibold hover:text-elm-dark">AI Guidance for staff and students</a>.
+                                </p>
+                            </div>
+                            <div className="bg-[#e8eceb] border border-gray-200 p-4 rounded-xl text-gray-700">
+                                <h4 className="font-bold text-sm mb-1 flex items-center gap-2">
+                                    <Icon name="edit_square" size={18} /> Training
+                                </h4>
+                                <p className="text-xs leading-relaxed">
+                                    Training is available for <a href="#" className="underline font-semibold hover:text-elm-dark">staff and students</a>.
+                                </p>
+                            </div>
+                            </div>
+                        </div>
+                    </div>
+                    )}
+
+                    {hasChatStarted && (
+                    <>
+                        <div className="flex-1 overflow-y-auto w-full z-0 p-4 pb-0 scroll-smooth" ref={chatContainerRef}>
+                            <div className="max-w-4xl mx-auto space-y-8 pb-8 pt-4">
+                            {messages.map((msg, idx) => (
+                                <div key={idx} className={`${msg.role === 'assistant' ? 'mb-12' : ''}`}>
+                                    {msg.role === 'info' ? (
+                                        <div className="flex justify-center">
+                                            <div className={UI_STYLES.infoBubble}>
+                                                <Icon name="info" size={18} className="text-blue-600 mt-0.5" />
+                                                <div className="text-sm leading-relaxed">
+                                                    {(() => {
+                                                        const parts = msg.content.split(/<br>|\n/).map((part) => part.trim()).filter(Boolean);
+                                                        const heading = parts[0];
+                                                        const intro = parts[1];
+                                                        const bulletItems = parts.slice(2).map((item) => item.replace(/^-\\s*/, ''));
+                                                        return (
+                                                            <>
+                                                                {heading && <p className="font-semibold">{heading}</p>}
+                                                                {intro && <p className="mt-1">{intro}</p>}
+                                                                {bulletItems.length > 0 && (
+                                                                    <ul className="mt-2 list-disc pl-4 space-y-1">
+                                                                        {bulletItems.map((item, index) => (
+                                                                            <li key={index}>{item}</li>
+                                                                        ))}
+                                                                    </ul>
+                                                                )}
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : msg.role === 'user' ? (
+                                        <div className="flex justify-end mb-6">
+                                        <div className="bg-[#f0f0f0] text-gray-800 rounded-2xl rounded-tr-sm px-5 py-3.5 max-w-[85%] sm:max-w-[75%] relative group">
+                                            <p className="text-base leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                                            <CopyButton text={msg.content} className="absolute -bottom-6 right-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex gap-4">
+                                        <div className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-[#d1fae5] text-elm-dark shrink-0 mt-1">
+                                            <Icon name="park" size={20} className="text-elm-dark" />
+                                        </div>
+                                        <div className="flex-1 space-y-2">
+                                            <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed">
+                                                {msg.content.split('\n').map((paragraph, pIdx) => (
+                                                    paragraph ? <p key={pIdx} className="mb-4 last:mb-0">{paragraph}</p> : <br key={pIdx} />
+                                                ))}
+                                            </div>
+                                            <div className="flex items-center gap-2 pt-2">
+                                                <button 
+                                                    className={UI_STYLES.button.chip}
+                                                    onClick={() => copyToClipboard(msg.content)}
+                                                >
+                                                    <Icon name="content_copy" size={16} />
+                                                    Copy
+                                                </button>
+                                            </div>
+                                        </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                            <div ref={messagesEndRef} />
+                            </div>
+                        </div>
+
+                        <div className="w-full z-10 p-4 flex-shrink-0 max-w-4xl mx-auto">
+                        <div className={UI_STYLES.inputShell}>
+                            <div className="p-4 pb-0">
+                                <textarea 
+                                ref={inputRef}
+                                className="w-full bg-transparent border-none resize-none focus:ring-0 text-gray-800 placeholder-gray-500 text-base"
+                                placeholder="Ask a follow up question."
+                                aria-label="Chat input"
+                                style={{ height: `${inputHeight}px`, minHeight: '64px', maxHeight: '400px' }}
+                                value={inputVal}
+                                onChange={(e) => setInputVal(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                onDragOver={(e) => e.preventDefault()}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    handleImageFiles(e.dataTransfer.files);
+                                }}
+                            />
+                            <div className="flex items-center justify-between mt-2 mb-2">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                <div className="relative">
+                                    <button 
+                                    onClick={(e) => toggleDropdown(e, 'plus-menu')}
+                                    className={`p-2 rounded-lg border border-gray-400 text-gray-600 hover:bg-gray-300 transition-colors ${activeDropdown === 'plus-menu' ? 'bg-gray-300 text-gray-900' : ''}`}
+                                    >
+                                    <Icon name="add" size={20} />
+                                    </button>
+                                    {activeDropdown === 'plus-menu' && (
+                                    <div className="absolute bottom-full left-0 mb-2 w-56 bg-[#ebebeb] rounded-lg shadow-xl border border-gray-200 py-1 overflow-hidden z-30 origin-bottom-left">
+                                        <p className="px-4 py-2 text-xs font-semibold text-gray-500">Attach files from:</p>
+                                        <button 
+                                            onClick={handleNavigateToFolders}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-200/80 transition-colors text-left"
+                                        >
+                                            <span className="text-gray-500"><Icon name="folder" size={18} /></span>
+                                            <span>Folders</span>
+                                        </button>
+                                        <button 
+                                            onClick={handleUploadClick}
+                                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-200/80 transition-colors text-left"
+                                        >
+                                            <span className="text-gray-500"><Icon name="upload_file" size={18} /></span>
+                                            <span>Upload from this device</span>
+                                        </button>
+                                    </div>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center gap-2 text-sm text-gray-700 max-w-full overflow-hidden">
+                                    {/* Model selector -- opens a dropdown popover instead of the settings modal */}
+                                    <div className="relative" ref={modelDropdownRef}>
+                                        <button
+                                            onClick={() => setIsModelDropdownOpen(prev => !prev)}
+                                            className={cx(
+                                                UI_STYLES.button.selectorBase,
+                                                isModelDropdownOpen ? UI_STYLES.button.selectorActive : UI_STYLES.button.selectorInactive
+                                            )}
+                                            aria-expanded={isModelDropdownOpen}
+                                            aria-haspopup="listbox"
+                                        >
+                                            <Icon name="memory" size={18} className="shrink-0" />
+                                            <span className="truncate">{displayModelText}</span>
+                                            <Icon name={isModelDropdownOpen ? "expand_less" : "expand_more"} size={16} className="shrink-0" />
+                                        </button>
+                                        {renderModelDropdown()}
+                                    </div>
+                                    <button
+                                    onClick={() => setIsWebSearchEnabled((prev) => !prev)}
+                                    className={cx(
+                                        UI_STYLES.button.selectorBase,
+                                        isWebSearchEnabled ? UI_STYLES.button.selectorActive : UI_STYLES.button.selectorInactive
+                                    )}
+                                    aria-pressed={isWebSearchEnabled}
+                                    aria-label="Include Web Search"
+                                    >
+                                    <Icon name="public" size={18} className="shrink-0" />
+                                    <span className="hidden sm:inline">Include Web Search</span>
+                                    </button>
+                                    <button
+                                    onClick={() => {
+                                        if (!modelSupportsImages(selectedModelName)) {
+                                            showToast(imageSupportMessage);
+                                            return;
+                                        }
+                                        handleImageUploadClick();
+                                    }}
+                                    className={cx(
+                                        UI_STYLES.button.selectorBase,
+                                        UI_STYLES.button.selectorInactive,
+                                        'px-2',
+                                        !modelSupportsImages(selectedModelName) && 'opacity-40 cursor-not-allowed hover:bg-white/50 hover:shadow-none'
+                                    )}
+                                    aria-label="Image query"
+                                    aria-disabled={!modelSupportsImages(selectedModelName)}
+                                    title={!modelSupportsImages(selectedModelName) ? imageSupportMessage : 'Image query'}
+                                    >
+                                    <Icon name="image_search" size={18} className="shrink-0" />
+                                    </button>
+                                </div>
+                                </div>
+
+                                <button 
+                                className={`p-2 rounded-lg transition-colors ${inputVal.trim() ? 'bg-elm-dark text-white hover:bg-green-900' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                                onClick={handleSendMessage}
+                                disabled={!inputVal.trim()}
+                                aria-label="Send message"
+                                >
+                                <Icon name="arrow_upward" size={20} />
+                                </button>
+                            </div>
+                            </div>
+                            {attachedFiles.length > 0 && (
+                            <div className="bg-[#dadada] px-4 py-2.5 flex items-center gap-3">
+                                <Icon name="attach_file" size={18} className="text-gray-500" />
+                                <span className="text-xs font-medium text-gray-600">
+                                {attachedFiles.length} files attached
+                                </span>
+                                <button 
+                                onClick={() => setIsFilesSidebarOpen(true)}
+                                className="text-xs font-bold text-elm-dark hover:underline flex items-center gap-0.5 ml-auto"
+                                >
+                                View all <Icon name="chevron_right" size={14} />
+                                </button>
+                            </div>
+                            )}
+                            <div 
+                                className="h-4 w-full cursor-ns-resize hover:bg-gray-200 flex items-center justify-center group rounded-b-2xl"
+                                onMouseDown={handleMouseDown}
+                            >
+                                <div className="w-12 h-1 bg-gray-300 group-hover:bg-gray-400 rounded-full" />
+                            </div>
+                        </div>
+                        </div>
+                    </>
+                    )}
+                    
+                </div>
+
+                <footer className="p-4 text-center z-10 bg-white border-t border-transparent shrink-0">
+                    <div className="max-w-4xl mx-auto space-y-1">
+                    <p className="text-[10px] md:text-xs text-black font-bold">
+                        Please be aware that due to the nature of this technology, responses may include inaccurate, fictitious or completely wrong information.
+                    </p>
+                    <p className="text-[10px] md:text-xs text-black">
+                        Reminder: You are not talking to a human - If you are seeking or need welfare assistance please see <a href="#" className="text-blue-600 hover:underline inline-flex items-center">Student Wellbeing<Icon name="arrow_outward" size={12} className="ml-0.5 rotate-45 inline" /></a>. <a href="#" className="text-blue-600 hover:underline inline-flex items-center">Accessibility Statement<Icon name="arrow_outward" size={12} className="ml-0.5 rotate-45 inline" /></a>
+                    </p>
+                    </div>
+                </footer>
+
+                <div 
+                    className={`
+                    absolute inset-y-0 right-0 z-40 w-80 bg-white border-l border-gray-200 shadow-xl
+                    transform transition-transform duration-300 ease-in-out
+                    flex flex-col
+                    ${isFilesSidebarOpen ? 'translate-x-0' : 'translate-x-full'}
+                    `}
+                >
+                    <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                    <h3 className="font-bold text-gray-900">Attached files</h3>
+                    <button 
+                        onClick={() => setIsFilesSidebarOpen(false)}
+                        className="text-gray-400 hover:text-gray-600"
+                    >
+                        <Icon name="close" size={20} />
+                    </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    <p className="text-xs text-gray-500 mb-2">
+                        Files that have been attached to this chat.
+                    </p>
+                    
+                    {attachedFiles.length === 0 ? (
+                        <p className="text-sm text-gray-400 italic text-center py-8">No files attached</p>
+                    ) : (
+                        attachedFiles.map((file, idx) => (
+                        <div key={idx} className="p-3 border border-gray-200 rounded-lg flex items-start gap-3 group hover:border-elm-dark/30 transition-colors">
+                            <div className="w-10 h-10 bg-gray-50 rounded flex items-center justify-center shrink-0">
+                            <span className="text-[10px] font-bold text-gray-500 uppercase">{file.type}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-700 truncate">{file.name}</p>
+                            <p className="text-xs text-gray-400">{file.size} • {file.date}</p>
+                            </div>
+                            <button 
+                            onClick={() => removeFile(idx)}
+                            className="text-xs font-medium text-red-500 hover:text-red-700 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                            >
+                            Remove
+                            </button>
+                        </div>
+                        ))
+                    )}
+                    </div>
+
+                    <div className="p-5 border-t border-gray-100 bg-gray-50">
+                    <div className="flex items-center gap-2 mb-2 text-gray-700 font-bold text-xs">
+                        <Icon name="error" size={16} />
+                        <span>Document text limit: {selectedModelName}</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-gray-600 w-[80%] rounded-full"></div>
+                    </div>
+                    <div className="flex justify-end mt-1">
+                        <span className="text-[10px] text-gray-500">80%</span>
+                    </div>
+                    </div>
+                </div>
+
+                {isUploadModalOpen && (
+                    <div 
+                    className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                    role="dialog"
+                    aria-modal="true"
+                    >
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
+                        
+                        <div className="flex justify-center mb-4">
+                            <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center border-4 border-amber-50">
+                            <Icon name="cloud_upload" size={24} />
+                            </div>
+                        </div>
+
+                        <h2 className="text-xl font-bold text-center text-gray-900 mb-2">Before you upload files</h2>
+                        <p className="text-sm text-center text-gray-500 mb-6">You confirm you have the right to share these documents?</p>
+
+                        <div className="bg-sky-50 border border-sky-200 rounded-lg p-4 mb-8 text-xs text-sky-800 space-y-3">
+                            <p className="flex gap-2">
+                            <Icon name="info" size={18} className="shrink-0 mt-0.5" />
+                            <span>
+                                ELM operates under a Zero Data Retention policy with OpenAI.
+                                Your data stays secure and is restricted to University use only.
+                            </span>
+                            </p>
+                            <p>
+                            If you need to process personal or private data for business purposes, please contact <a href="#" className="underline font-medium">edina@ed.ac.uk</a>. You may need formal approval from the University Data Protection Officer.
+                            </p>
+                            <p>
+                            ELM must not be used to upload identifiable patient or clinical data.
+                            </p>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-4">
+                            <button 
+                            onClick={() => setIsUploadModalOpen(false)}
+                            className="text-sm font-bold text-gray-600 hover:text-gray-900 px-3 py-2"
+                            >
+                            Decline
+                            </button>
+                            <button 
+                            onClick={handleAcceptUpload}
+                            className="text-sm font-bold text-elm-dark hover:text-green-800 px-3 py-2"
+                            >
+                            Accept
+                            </button>
+                        </div>
+                    </div>
+                    </div>
+                )}
+
+                {isSettingsModalOpen && (
+                    <div 
+                    className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+                    role="dialog"
+                    aria-modal="true"
+                    >
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden">
+                        <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-white shrink-0">
+                            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                            <Icon name="settings" size={24} className="text-elm-dark" />
+                            <span>Settings</span>
+                            </h2>
+                            <button onClick={() => setIsSettingsModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500">
+                            <Icon name="close" size={20} />
+                            </button>
+                        </div>
+                        
+                        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+                            <div className="w-full md:w-64 bg-gray-50 border-b md:border-b-0 md:border-r border-gray-200 overflow-x-auto md:overflow-y-auto flex md:flex-col shrink-0">
+                            {SETTINGS_TABS.map((tab) => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveSettingsTab(tab.id)}
+                                    className={`
+                                    flex items-center gap-3 px-5 py-4 text-sm font-medium transition-all text-left whitespace-nowrap
+                                    ${activeSettingsTab === tab.id 
+                                        ? 'bg-white text-elm-dark border-b-2 md:border-b-0 md:border-l-4 border-elm-dark shadow-sm' 
+                                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 border-l-4 border-transparent'
+                                    }
+                                    `}
+                                >
+                                    {tab.icon}
+                                    <span>{tab.label}</span>
+                                </button>
+                            ))}
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-white">
+                            <div className="max-w-2xl mx-auto" key={activeSettingsTab}>
+                                
+                                <h3 className="text-2xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-2">
+                                    {SETTINGS_TABS.find(t => t.id === activeSettingsTab)?.label}
+                                </h3>
+
+                                {activeSettingsTab === 'general' && (
+                                    <div className="space-y-6">
+                                        <div className="space-y-4">
+                                        <label className="block text-sm font-bold text-gray-700">Appearance</label>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <button className="flex flex-col items-center gap-2 p-3 border-2 border-elm-dark bg-green-50 rounded-lg text-elm-dark">
+                                                <Icon name="light_mode" size={24} />
+                                                <span className="text-xs font-semibold">Light</span>
+                                            </button>
+                                            <button className="flex flex-col items-center gap-2 p-3 border border-gray-200 hover:border-gray-400 rounded-lg text-gray-600">
+                                                <div className="w-6 h-6 bg-gray-800 rounded-full" />
+                                                <span className="text-xs font-medium">Dark</span>
+                                            </button>
+                                            <button className="flex flex-col items-center gap-2 p-3 border border-gray-200 hover:border-gray-400 rounded-lg text-gray-600">
+                                                <Icon name="settings" size={24} />
+                                                <span className="text-xs font-medium">System</span>
+                                            </button>
+                                        </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                        <label className="block text-sm font-bold text-gray-700">Language</label>
+                                        <div className="relative">
+                                            <Icon name="public" size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                            <select className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-elm-dark/20 focus:border-elm-dark outline-none bg-white">
+                                                <option>English (UK)</option>
+                                                <option>English (US)</option>
+                                                <option>French</option>
+                                                <option>Spanish</option>
+                                            </select>
+                                        </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeSettingsTab === 'about' && (
+                                    <div className="text-center py-8">
+                                        <div className="w-16 h-16 bg-elm-dark text-white rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                        <Icon name="park" size={32} className="text-elm-dark" />
+                                        </div>
+                                        <h4 className="text-xl font-bold text-gray-900">ELM Chat Interface</h4>
+                                        <p className="text-sm text-gray-500 mt-2">Version 1.2.0 (Beta)</p>
+                                        <p className="text-sm text-gray-500 mt-1">Developed by EDINA, The University of Edinburgh</p>
+                                        
+                                        <div className="mt-8 flex justify-center gap-4 text-sm text-elm-dark font-medium">
+                                        <a href="#" className="hover:underline">Terms of Service</a>
+                                        <span className="text-gray-300">|</span>
+                                        <a href="#" className="hover:underline">Privacy Policy</a>
+                                        </div>
+                                    </div>
+                                )}
+
+                            </div>
+                            </div>
+                    </div>
+                    </div>
+                    </div>
+                )}
+
+                {renderMobileSheet()}
+
+                </main>
+            );
+        };
+
+        // 4. APP COMPONENT
+        const App = () => {
+            const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+            const [currentView, setCurrentView] = useState('chat');
+
+            const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
+
+            return (
+                <div className="flex h-screen w-full bg-[#f4f4f4] text-slate-800 overflow-hidden relative">
+                    {/* Mobile Overlay */}
+                    {isSidebarOpen && (
+                        <div 
+                        className="fixed inset-0 bg-black/50 z-20 md:hidden"
+                        onClick={() => setIsSidebarOpen(false)}
+                        aria-hidden="true"
+                        />
+                    )}
+
+                    <Sidebar 
+                        isOpen={isSidebarOpen} 
+                        onClose={() => setIsSidebarOpen(false)}
+                        currentView={currentView}
+                        onNavigate={setCurrentView}
+                    />
+
+                    <div className={`flex-1 flex flex-col h-full w-full relative`}>
+                        <MainArea 
+                        isSidebarOpen={isSidebarOpen} 
+                        toggleSidebar={toggleSidebar}
+                        currentView={currentView}
+                        onNavigate={setCurrentView}
+                        />
+                    </div>
+                </div>
+            );
+        };
+
+        // --- MOUNT ---
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
