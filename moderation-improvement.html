@@ -651,6 +651,10 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit e
             const [showReasonForm, setShowReasonForm] = useState(false);
             const [disableReasonTouched, setDisableReasonTouched] = useState(false);
 
+            // State for the Settings panel moderation toggle flow (separate from the in-chat flow)
+            const [showSettingsReasonForm, setShowSettingsReasonForm] = useState(false);
+            const [settingsDisableReason, setSettingsDisableReason] = useState('');
+
             // Model Dropdown State -- controls the quick-switch popover
             const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
             // Reasoning amount for thinking models (o3, o4 mini, GPT-5.1 Thinking)
@@ -668,6 +672,8 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit e
             const promptDialogRef = useRef(null);
             const uploadDialogRef = useRef(null);
             const settingsDialogRef = useRef(null);
+            // Ref used to move focus into the explanation textarea when the settings form expands
+            const settingsReasonInputRef = useRef(null);
             const mobileSheetRef = useRef(null);
             const resizingRef = useRef(false);
             const startYRef = useRef(0);
@@ -747,6 +753,15 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit e
                     }
                 };
             }, [mobileSheet]);
+
+            // When the settings reason form expands, move focus to its textarea so keyboard
+            // and screen-reader users are taken directly to the input (WCAG 2.4.3 Focus Order).
+            useEffect(() => {
+                if (showSettingsReasonForm && settingsReasonInputRef.current) {
+                    settingsReasonInputRef.current.focus();
+                }
+            }, [showSettingsReasonForm]);
+
 
             useEffect(() => {
                 if (messagesEndRef.current) {
@@ -994,6 +1009,8 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                 setDisableReason("");
                 setShowReasonForm(false);
                 setDisableReasonTouched(false);
+                setShowSettingsReasonForm(false);
+                setSettingsDisableReason('');
                 setActiveDropdown(null);
             };
 
@@ -3087,7 +3104,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                     aria-describedby="settings-modal-desc"
                     ref={settingsDialogRef}
                     tabIndex={-1}
-                    onKeyDown={(e) => handleDialogKeyDown(e, settingsDialogRef, () => setIsSettingsModalOpen(false))}
+                    onKeyDown={(e) => handleDialogKeyDown(e, settingsDialogRef, () => { setIsSettingsModalOpen(false); setShowSettingsReasonForm(false); setSettingsDisableReason(''); })}
                     >
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden">
                         <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-white shrink-0">
@@ -3095,7 +3112,7 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                             <Icon name="settings" size={24} className="text-elm-dark" />
                             <span>Settings</span>
                             </h2>
-                            <button onClick={() => setIsSettingsModalOpen(false)} className={cx("p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500 min-w-[36px] min-h-[36px]", UI_STYLES.focus.ring)} aria-label="Close settings">
+                            <button onClick={() => { setIsSettingsModalOpen(false); setShowSettingsReasonForm(false); setSettingsDisableReason(''); }} className={cx("p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500 min-w-[36px] min-h-[36px]", UI_STYLES.focus.ring)} aria-label="Close settings">
                             <Icon name="close" size={20} />
                             </button>
                         </div>
@@ -3159,6 +3176,153 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                                             </select>
                                         </div>
                                         </div>
+
+                                        {/* ── University Moderation ─────────────────────────────────────
+                                             Non-undergraduate users can disable the university moderation
+                                             layer here. Undergraduate users see a locked, read-only state.
+                                             The toggle does not change until the user confirms via the
+                                             inline explanation form (WCAG 2.2 AA § 3.3 – Error Prevention).
+                                        ─────────────────────────────────────────────────────────────── */}
+                                        <div className="space-y-3 pt-2 border-t border-gray-100">
+                                            <div>
+                                                <p className="text-sm font-bold text-gray-700" id="moderation-setting-label">University Moderation</p>
+                                                <p className="text-xs text-gray-500 mt-0.5">
+                                                    Controls whether the university moderation layer is active for your account. Turning this off does not disable the model's own built-in safety features.
+                                                </p>
+                                            </div>
+
+                                            {userRole === 'undergraduate' ? (
+                                                // Undergraduate: visible but disabled -- explains why without hiding the feature
+                                                <div className="flex items-start gap-3 p-4 border border-gray-200 rounded-xl bg-gray-50">
+                                                    {/* aria-disabled keeps the element in the Tab order so screen readers can read the note */}
+                                                    <button
+                                                        role="switch"
+                                                        aria-checked="true"
+                                                        aria-disabled="true"
+                                                        aria-describedby="moderation-undergrad-note"
+                                                        tabIndex={0}
+                                                        className={cx("relative inline-flex h-6 w-11 shrink-0 items-center rounded-full bg-gray-300 opacity-50 cursor-not-allowed mt-0.5", UI_STYLES.focus.ring)}
+                                                    >
+                                                        <span className="sr-only">University moderation (unavailable for undergraduate accounts)</span>
+                                                        <span className="inline-block h-4 w-4 translate-x-1 transform rounded-full bg-white shadow" aria-hidden="true" />
+                                                    </button>
+                                                    <div>
+                                                        <p className="text-sm font-medium text-gray-700">University moderation is on</p>
+                                                        <p id="moderation-undergrad-note" className="text-xs text-gray-500 mt-0.5">
+                                                            This setting is not available for undergraduate accounts.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                // Eligible users: interactive toggle with inline explanation form
+                                                <div className="border border-gray-200 rounded-xl overflow-hidden">
+
+                                                    {/* Toggle row -- the toggle visual state only changes once the action is confirmed */}
+                                                    <div className="flex items-center justify-between gap-4 p-4">
+                                                        <div>
+                                                            <p className="text-sm font-medium text-gray-700">
+                                                                University moderation is <span className="font-semibold">{isModerationDisabled ? 'off' : 'on'}</span>
+                                                            </p>
+                                                            {isModerationDisabled && (
+                                                                <p className="text-xs text-amber-700 mt-0.5" role="status">
+                                                                    Model-level moderation may still apply.
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <button
+                                                            role="switch"
+                                                            aria-checked={!isModerationDisabled}
+                                                            aria-expanded={showSettingsReasonForm}
+                                                            aria-controls="settings-moderation-form"
+                                                            aria-label={`University moderation is ${isModerationDisabled ? 'off' : 'on'}. Click to turn it ${isModerationDisabled ? 'on' : 'off'}.`}
+                                                            onClick={() => {
+                                                                if (isModerationDisabled) {
+                                                                    // Re-enable: one step, no form needed (per requirements)
+                                                                    setIsModerationDisabled(false);
+                                                                    setShowSettingsReasonForm(false);
+                                                                    setSettingsDisableReason('');
+                                                                } else {
+                                                                    // Show the inline form to collect the reason before disabling
+                                                                    setShowSettingsReasonForm(prev => !prev);
+                                                                }
+                                                            }}
+                                                            className={cx(
+                                                                "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors motion-reduce:transition-none",
+                                                                !isModerationDisabled ? "bg-elm-dark" : "bg-gray-300",
+                                                                UI_STYLES.focus.ring
+                                                            )}
+                                                        >
+                                                            <span className="sr-only">Toggle university moderation</span>
+                                                            <span
+                                                                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform motion-reduce:transition-none ${!isModerationDisabled ? 'translate-x-6' : 'translate-x-1'}`}
+                                                                aria-hidden="true"
+                                                            />
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Inline explanation form -- expands below the toggle row when disabling.
+                                                        Hidden with aria-hidden when collapsed so it is not announced while closed. */}
+                                                    <div
+                                                        id="settings-moderation-form"
+                                                        aria-hidden={!showSettingsReasonForm}
+                                                        className={showSettingsReasonForm && !isModerationDisabled ? "border-t border-gray-200 p-4 bg-gray-50 space-y-3" : "sr-only"}
+                                                    >
+                                                        <label htmlFor="settings-disable-reason" className="block text-sm font-semibold text-gray-700">
+                                                            Please explain why you need to disable university moderation
+                                                        </label>
+                                                        <textarea
+                                                            id="settings-disable-reason"
+                                                            ref={settingsReasonInputRef}
+                                                            value={settingsDisableReason}
+                                                            onChange={(e) => setSettingsDisableReason(e.target.value.slice(0, 400))}
+                                                            className={cx("w-full border border-gray-300 rounded-lg p-3 text-sm resize-none", UI_STYLES.focus.ring)}
+                                                            rows={4}
+                                                            placeholder="Enter your reason here..."
+                                                            maxLength={400}
+                                                            aria-describedby="settings-reason-count"
+                                                            aria-required="true"
+                                                        />
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            {/* aria-live announces the character count to screen readers as the user types */}
+                                                            <span
+                                                                id="settings-reason-count"
+                                                                aria-live="polite"
+                                                                aria-atomic="true"
+                                                                className="text-xs text-gray-500"
+                                                            >
+                                                                {settingsDisableReason.length}/400 characters
+                                                            </span>
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    onClick={() => { setShowSettingsReasonForm(false); setSettingsDisableReason(''); }}
+                                                                    className={cx("text-sm font-medium text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-200 transition-colors motion-reduce:transition-none min-h-[36px]", UI_STYLES.focus.ring)}
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (!settingsDisableReason.trim()) return;
+                                                                        setIsModerationDisabled(true);
+                                                                        setShowSettingsReasonForm(false);
+                                                                        setSettingsDisableReason('');
+                                                                    }}
+                                                                    disabled={!settingsDisableReason.trim()}
+                                                                    aria-disabled={!settingsDisableReason.trim()}
+                                                                    className={cx(
+                                                                        "px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors motion-reduce:transition-none min-h-[36px]",
+                                                                        settingsDisableReason.trim() ? "bg-elm-dark text-white hover:bg-green-900" : "bg-gray-200 text-gray-400 cursor-not-allowed",
+                                                                        UI_STYLES.focus.ring
+                                                                    )}
+                                                                >
+                                                                    Confirm &amp; disable
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
                                     </div>
                                 )}
 
