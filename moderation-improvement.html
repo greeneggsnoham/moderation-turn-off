@@ -328,6 +328,16 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit e
 
         const cx = (...classes) => classes.filter(Boolean).join(' ');
 
+        // -- Roles available in the mockup role switcher.
+        // Users with the 'undergraduate' role cannot disable university moderation.
+        const ROLES = [
+            { id: 'undergraduate', label: 'Undergraduate' },
+            { id: 'postgraduate', label: 'Postgraduate' },
+            { id: 'phd', label: 'PhD / Researcher' },
+            { id: 'lecturer', label: 'Lecturer / Faculty' },
+            { id: 'staff', label: 'Staff / Admin' },
+        ];
+
         const UI_STYLES = {
             button: {
                 primary: "flex items-center gap-2 bg-elm-dark hover:bg-green-900 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm",
@@ -611,6 +621,13 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam finibus blandit e
             const [inputHeight, setInputHeight] = useState(64);
             const [isEphemeralChat, setIsEphemeralChat] = useState(false);
 
+            // Moderation state -- tracks the user's role and whether university moderation is active
+            const [userRole, setUserRole] = useState('staff');
+            const [isModerationDisabled, setIsModerationDisabled] = useState(false);
+            const [isChatLocked, setIsChatLocked] = useState(false);
+            const [disableReason, setDisableReason] = useState('');
+            const [showReasonForm, setShowReasonForm] = useState(false);
+
             // Model Dropdown State -- controls the quick-switch popover
             const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
             // Reasoning amount for thinking models (o3, o4 mini, GPT-5.1 Thinking)
@@ -833,16 +850,26 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
             };
 
             const handleSendMessage = () => {
-                if (!inputVal.trim()) return;
+                if (!inputVal.trim() || isChatLocked) return;
 
                 const userMsg = inputVal;
                 setInputVal("");
                 setHasChatStarted(true);
-                
+
                 setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
 
                 setTimeout(() => {
-                setMessages(prev => [...prev, { role: 'assistant', content: LOREM_IPSUM_RESPONSE }]);
+                    // If university moderation is disabled, respond normally with a placeholder reply.
+                    // Otherwise, trigger the moderation response and lock the chat.
+                    if (isModerationDisabled) {
+                        setMessages(prev => [...prev, { role: 'assistant', content: LOREM_IPSUM_RESPONSE }]);
+                    } else {
+                        // Non-undergraduate users can be offered the option to disable moderation.
+                        const canDisable = userRole !== 'undergraduate';
+                        setMessages(prev => [...prev, { role: 'moderation', canDisable }]);
+                        setIsChatLocked(true);
+                        setShowReasonForm(false);
+                    }
                 }, 600);
             };
 
@@ -851,6 +878,20 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                 e.preventDefault();
                 handleSendMessage();
                 }
+            };
+
+            // Resets the full session when the user switches role in the mockup,
+            // so each demo flow starts from a clean state.
+            const handleRoleChange = (roleId) => {
+                setUserRole(roleId);
+                setMessages([]);
+                setHasChatStarted(false);
+                setInputVal("");
+                setIsChatLocked(false);
+                setIsModerationDisabled(false);
+                setDisableReason("");
+                setShowReasonForm(false);
+                setActiveDropdown(null);
             };
 
             const copyToClipboard = async (text) => {
@@ -1108,9 +1149,28 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                             <Icon name="close" size={20} />
                         </button>
                         </div>
+                        {/* For the Account sheet, show a role switcher above the standard options */}
+                        {isAccount && (
+                            <div className="mb-4 pb-4 border-b border-gray-200">
+                                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Switch role (demo)</p>
+                                <div className="space-y-1">
+                                    {ROLES.map(role => (
+                                        <button
+                                            key={role.id}
+                                            onClick={() => { handleRoleChange(role.id); setMobileSheet(null); }}
+                                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-colors ${userRole === role.id ? 'border-elm-dark bg-green-50 text-elm-dark font-semibold' : 'border-gray-200 hover:bg-gray-50 text-gray-800'}`}
+                                        >
+                                            <span className="text-sm">{role.label}</span>
+                                            {userRole === role.id && <Icon name="check" size={18} className="text-elm-dark" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         <div className="space-y-2">
                         {options.map((opt, idx) => (
-                            <button 
+                            <button
                             key={idx}
                             onClick={() => {
                                 if (opt.onClick) {
@@ -2136,14 +2196,14 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                     <button 
                         className="p-2 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100 transition-colors"
                         aria-label="New chat"
-                        onClick={() => { setMessages([]); setHasChatStarted(false); setInputVal(""); }}
+                        onClick={() => { setMessages([]); setHasChatStarted(false); setInputVal(""); setIsChatLocked(false); setShowReasonForm(false); setDisableReason(""); }}
                     >
                         <Icon name="edit_square" size={20} />
                     </button>
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-4 md:gap-6 text-sm text-gray-600 font-medium ml-auto">
-                        <button 
+                        <button
                         onClick={toggleEphemeralChat}
                         className={`p-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors ${isEphemeralChat ? 'bg-gray-200 text-elm-dark border-elm-dark/40' : 'text-gray-600'}`}
                         aria-label="Do not save this chat"
@@ -2151,7 +2211,26 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                         >
                         <DashedChatIcon size={18} />
                         </button>
-                        <button 
+
+                        {/* Moderation-off indicator -- appears globally when university moderation is disabled.
+                            Clicking it re-enables moderation with a single step (no form required). */}
+                        {isModerationDisabled && (
+                            <button
+                                onClick={() => {
+                                    setIsModerationDisabled(false);
+                                    setMessages(prev => [...prev, { role: 'info', content: 'University moderation has been re-enabled.' }]);
+                                    setHasChatStarted(true);
+                                }}
+                                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200 transition-colors"
+                                aria-label="University moderation is off. Click to re-enable."
+                                title="Click to re-enable university moderation"
+                            >
+                                <Icon name="gpp_bad" size={14} />
+                                <span className="hidden sm:inline">Moderation off</span>
+                            </button>
+                        )}
+
+                        <button
                         onClick={() => setMobileSheet('responsible-ai')}
                         className={cx(UI_STYLES.button.icon, 'sm:hidden')}
                         aria-label="Responsible AI"
@@ -2216,6 +2295,20 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                             </button>
                             {activeDropdown === 'profile' && (
                             <div className="absolute top-full right-0 mt-2 w-64 bg-[#ebebeb] rounded-lg shadow-xl border border-gray-200 py-2 overflow-hidden z-30 origin-top-right">
+                                {/* Role switcher -- for the mockup demo, switch between user roles here */}
+                                <div className="px-3 pt-1 pb-2 border-b border-gray-300">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1.5 px-1">Switch role (demo)</p>
+                                    {ROLES.map(role => (
+                                        <button
+                                            key={role.id}
+                                            onClick={() => handleRoleChange(role.id)}
+                                            className={`w-full flex items-center justify-between px-2 py-1.5 text-sm rounded-md transition-colors text-left ${userRole === role.id ? 'text-elm-dark font-semibold bg-green-50' : 'text-gray-700 hover:bg-gray-200/80'}`}
+                                        >
+                                            <span>{role.label}</span>
+                                            {userRole === role.id && <Icon name="check" size={16} className="text-elm-dark" />}
+                                        </button>
+                                    ))}
+                                </div>
                                 <div className="px-2 py-1 space-y-1">
                                     <button onClick={() => { setActiveSettingsTab('general'); setIsSettingsModalOpen(true); setActiveDropdown(null); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-200/80 transition-colors text-left">
                                         <span className="text-gray-500"><Icon name="settings" size={18} /></span>
@@ -2273,19 +2366,20 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
 
                             <div className={cx(UI_STYLES.inputShell, 'w-full max-w-2xl mb-8')}>
                             <div className="p-4 pb-0">
-                                <textarea 
+                                <textarea
                                 ref={inputRef}
-                                className="w-full bg-transparent border-none resize-none focus:ring-0 text-gray-800 placeholder-gray-500 text-base"
-                                placeholder="Ask anything..."
+                                className={`w-full bg-transparent border-none resize-none focus:ring-0 text-gray-800 placeholder-gray-500 text-base ${isChatLocked ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                placeholder={isChatLocked ? "Chat locked by moderation." : "Ask anything..."}
                                 aria-label="Chat input"
                                 style={{ height: `${inputHeight}px`, minHeight: '64px', maxHeight: '400px' }}
                                 value={inputVal}
-                                onChange={(e) => setInputVal(e.target.value)}
+                                onChange={(e) => { if (!isChatLocked) setInputVal(e.target.value); }}
                                 onKeyDown={handleKeyDown}
+                                disabled={isChatLocked}
                                 onDragOver={(e) => e.preventDefault()}
                                 onDrop={(e) => {
                                     e.preventDefault();
-                                    handleImageFiles(e.dataTransfer.files);
+                                    if (!isChatLocked) handleImageFiles(e.dataTransfer.files);
                                 }}
                                 />
                                 <div className="flex items-center justify-between mt-2 mb-2">
@@ -2466,6 +2560,92 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                                                 </div>
                                             </div>
                                         </div>
+                                    ) : msg.role === 'moderation' ? (
+                                        // Moderation response -- shown when the system intercepts a message.
+                                        // Only show the disable offer on the most recent moderation message.
+                                        (() => {
+                                            const isLatest = messages.slice(idx + 1).every(m => m.role !== 'moderation');
+                                            return (
+                                                <div className="flex gap-4">
+                                                    <div className="w-8 h-8 rounded-full border border-amber-200 flex items-center justify-center bg-amber-50 shrink-0 mt-1">
+                                                        <Icon name="shield" size={20} className="text-amber-600" />
+                                                    </div>
+                                                    <div className="flex-1 space-y-4">
+                                                        {/* Wellbeing message with university support links */}
+                                                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3 text-sm text-gray-800 leading-relaxed">
+                                                            <p className="font-semibold text-amber-800">We're sorry to hear that you're struggling.</p>
+                                                            <p>If this is an emergency, please call 999, NHS 111, or University Security at 0131 650 2257. You can find more emergency crisis and support services here: <a href="https://edin.ac/3j22StG" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-0.5">https://edin.ac/3j22StG <Icon name="open_in_new" size={12} /></a>.</p>
+                                                            <p>The Student Wellbeing Team is here to help you. You can use their referral form (<a href="https://edin.ac/3xe9kd0" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-0.5">https://edin.ac/3xe9kd0 <Icon name="open_in_new" size={12} /></a>) and they will reach out to you during University working hours to offer support.</p>
+                                                            <p>We also encourage you to look at the Student Counselling Service website: <a href="https://edin.ac/49AEGbY" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-0.5">https://edin.ac/49AEGbY <Icon name="open_in_new" size={12} /></a>. There you can find information about sources of support, ideas for things that can help you, and information about how to get support from the Student Counselling Service.</p>
+                                                            <p>If you have experienced racial harassment, hate crime or gender-based violence, the University can support you. You can report this either anonymously or with your contact details through Report + Support: <a href="https://reportandsupport.ed.ac.uk/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-0.5">https://reportandsupport.ed.ac.uk/ <Icon name="open_in_new" size={12} /></a>.</p>
+                                                        </div>
+
+                                                        {/* Explain that the chat is now locked */}
+                                                        <p className="text-xs text-gray-500 italic">This chat has been locked by the university moderation system.</p>
+
+                                                        {/* Offer to disable moderation -- only for eligible users on the latest moderation message */}
+                                                        {msg.canDisable && isChatLocked && isLatest && !showReasonForm && (
+                                                            <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-white">
+                                                                <p className="text-sm text-gray-700">Would you like to disable university moderation on your account?</p>
+                                                                <button
+                                                                    onClick={() => setShowReasonForm(true)}
+                                                                    className="text-sm font-semibold text-elm-dark hover:text-green-800 underline"
+                                                                >
+                                                                    Yes, disable university moderation
+                                                                </button>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Inline explanation form -- expands when the user selects Yes */}
+                                                        {msg.canDisable && isChatLocked && isLatest && showReasonForm && (
+                                                            <div className="border border-elm-dark/30 rounded-xl p-4 space-y-3 bg-white">
+                                                                <label htmlFor="disable-reason" className="block text-sm font-semibold text-gray-700">
+                                                                    Please explain why you need to disable university moderation
+                                                                </label>
+                                                                <textarea
+                                                                    id="disable-reason"
+                                                                    value={disableReason}
+                                                                    onChange={(e) => setDisableReason(e.target.value.slice(0, 400))}
+                                                                    className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-elm-dark/20 focus:border-elm-dark outline-none resize-none"
+                                                                    rows={4}
+                                                                    placeholder="Enter your reason here..."
+                                                                    maxLength={400}
+                                                                    aria-describedby="disable-reason-count"
+                                                                />
+                                                                <div className="flex items-center justify-between">
+                                                                    <span id="disable-reason-count" className="text-xs text-gray-400">{disableReason.length}/400</span>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            if (!disableReason.trim()) return;
+                                                                            setIsModerationDisabled(true);
+                                                                            setIsChatLocked(false);
+                                                                            setShowReasonForm(false);
+                                                                            setMessages(prev => [...prev, { role: 'moderation-disabled' }]);
+                                                                        }}
+                                                                        disabled={!disableReason.trim()}
+                                                                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${disableReason.trim() ? 'bg-elm-dark text-white hover:bg-green-900' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                                                                        aria-disabled={!disableReason.trim()}
+                                                                    >
+                                                                        Confirm &amp; disable moderation
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()
+                                    ) : msg.role === 'moderation-disabled' ? (
+                                        // Confirmation shown after the user successfully disables moderation
+                                        <div className="flex justify-center">
+                                            <div className="border border-green-300 bg-green-50 text-green-900 rounded-xl px-4 py-3 text-sm flex items-start gap-2 max-w-2xl w-full">
+                                                <Icon name="check_circle" size={18} className="text-green-600 mt-0.5 shrink-0" />
+                                                <div>
+                                                    <p className="font-semibold">University moderation has been disabled.</p>
+                                                    <p className="mt-1 text-green-800">Please note: this model's built-in moderation may still apply. The chat has been unlocked, so if you do encounter the models moderation, you may be able to convince it to continue. You can re-enable university moderation at any time using the indicator in the header.</p>
+                                                </div>
+                                            </div>
+                                        </div>
                                     ) : msg.role === 'user' ? (
                                         <div className="flex justify-end mb-6">
                                         <div className="bg-[#f0f0f0] text-gray-800 rounded-2xl rounded-tr-sm px-5 py-3.5 max-w-[85%] sm:max-w-[75%] relative group">
@@ -2505,19 +2685,20 @@ When uploading images (JPEG, PNG, WebP, GIF), please consider the following:\n\n
                         <div className="w-full z-10 p-4 flex-shrink-0 max-w-4xl mx-auto">
                         <div className={UI_STYLES.inputShell}>
                             <div className="p-4 pb-0">
-                                <textarea 
+                                <textarea
                                 ref={inputRef}
-                                className="w-full bg-transparent border-none resize-none focus:ring-0 text-gray-800 placeholder-gray-500 text-base"
-                                placeholder="Ask a follow up question."
+                                className={`w-full bg-transparent border-none resize-none focus:ring-0 text-gray-800 placeholder-gray-500 text-base ${isChatLocked ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                placeholder={isChatLocked ? "Chat locked by moderation." : "Ask a follow up question."}
                                 aria-label="Chat input"
                                 style={{ height: `${inputHeight}px`, minHeight: '64px', maxHeight: '400px' }}
                                 value={inputVal}
-                                onChange={(e) => setInputVal(e.target.value)}
+                                onChange={(e) => { if (!isChatLocked) setInputVal(e.target.value); }}
                                 onKeyDown={handleKeyDown}
+                                disabled={isChatLocked}
                                 onDragOver={(e) => e.preventDefault()}
                                 onDrop={(e) => {
                                     e.preventDefault();
-                                    handleImageFiles(e.dataTransfer.files);
+                                    if (!isChatLocked) handleImageFiles(e.dataTransfer.files);
                                 }}
                             />
                             <div className="flex items-center justify-between mt-2 mb-2">
